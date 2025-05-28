@@ -1,0 +1,6 @@
+@WasteWatchAIBackend_HostAddress = http://localhost:5298
+
+GET {{WasteWatchAIBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
