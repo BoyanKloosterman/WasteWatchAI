@@ -3,8 +3,187 @@
 
 <PageTitle>Dashboard</PageTitle>
 
-<h1>Dashboard</h1>
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 fw-bold" style="color: #634AFF;">
+            Afvalbeheer Dashboard
+        </h1>
+        <div class="text-muted small">
+            Laatste update: 10:12
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
+                <div class="card-body">
+                    <h5 class="card-title">Totaal afval</h5>
+                    <p class="card-text display-6 fw-bold">3.200 kg</p>
+                    <p class="text-muted small mb-0">Gedetecteerd deze maand</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
+                <div class="card-body">
+                    <h5 class="card-title">Actieve waarschuwingen</h5>
+                    <p class="card-text display-6 fw-bold">2 gebieden</p>
+                    <p class="text-muted small mb-0">Hoge afvalniveaus</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
+                <div class="card-body">
+                    <h5 class="card-title">Afvaltypes</h5>
+                    <p class="card-text fw-bold">Plastic, Papier, Glas</p>
+                    <p class="text-muted small mb-0">Meest voorkomende types</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
+                <div class="card-body">
+                    <h5 class="card-title">Hotspots</h5>
+                    <p class="card-text display-6 fw-bold">5 locaties</p>
+                    <p class="text-muted small mb-0">Meeste afval gemeld</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Afvaltype</label>
+                    <select class="form-select">
+                        <option selected>Selecteer type</option>
+                        <option>Plastic</option>
+                        <option>Papier</option>
+                        <option>Glas</option>
+                        <option>Restafval</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Locatie</label>
+                    <select class="form-select">
+                        <option selected>Kies locatie</option>
+                        <option>Station Zuid</option>
+                        <option>Plein Noord</option>
+                        <option>Centrum</option>
+                        <option>Westpark</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Datum</label>
+                    <select class="form-select">
+                        <option selected>Selecteer datum</option>
+                        <option>Vandaag</option>
+                        <option>Deze week</option>
+                        <option>Deze maand</option>
+                        <option>Dit jaar</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <button class="btn w-100" style="background-color: #634AFF; color: white;">
+                        Toepassen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-4">Realtime waarschuwingen</h5>
+                    <div class="table-responsive">
+                        <table class="table table-borderless table-custom mb-0">
+                            <tbody>
+                                <tr>
+                                    <td class="fw-bold">Station Zuid</td>
+                                    <td><span class="badge bg-warning text-dark">Hoog</span></td>
+                                    <td>09:45</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Centrum</td>
+                                    <td><span class="badge bg-warning text-dark">Hoog</span></td>
+                                    <td>09:50</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Westpark</td>
+                                    <td><span class="badge bg-secondary">Opgelost</span></td>
+                                    <td>09:30</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4 mb-md-0">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-4" style="color: #634AFF;">Kerncijfers & trends</h5>
+                    <div class="bg-light rounded p-4 d-flex justify-content-center align-items-center" style="height: 250px;">
+                        <div class="text-center text-muted">
+                            <div>Grafiek placeholder</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-4" style="color: #634AFF;">Interactieve kaart</h5>
+                    <div class="bg-light rounded p-4 d-flex justify-content-center align-items-center" style="height: 250px;">
+                        <div class="text-center text-muted">
+                            <div>Kaart placeholder</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 @code {
 
 }
+
+<style>
+    .text-purple {
+        color: #634AFF;
+    }
+
+    .btn-purple {
+        background-color: #634AFF;
+        color: white;
+    }
+
+        .btn-purple:hover {
+            background-color: #5538e0;
+            color: white;
+        }
+
+    .border-purple {
+        border-color: #634AFF !important;
+    }
+
+    .table-custom tr:not(:last-child) td {
+        border-bottom: 1px solid #dee2e6;
+    }
+</style>
