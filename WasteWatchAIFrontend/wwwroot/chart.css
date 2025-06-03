@@ -1,0 +1,50 @@
+﻿/* Charts specific styling */
+.chart-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    min-height: 300px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    gap: 10px;
+    overflow-x: auto;
+}
+
+.chart-bar {
+    width: 40px;
+    min-width: 40px;
+    background-color: #0d6efd;
+    transition: height 0.3s ease;
+    border-radius: 4px 4px 0 0;
+}
+
+    .chart-bar:hover {
+        background-color: #0b5ed7;
+    }
+
+.chart-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 0.5rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.chart-container::-webkit-scrollbar {
+    height: 8px;
+}
+
+.chart-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.chart-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+    .chart-container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
