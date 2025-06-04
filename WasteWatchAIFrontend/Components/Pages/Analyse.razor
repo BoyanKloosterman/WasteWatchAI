@@ -1,0 +1,206 @@
+﻿@page "/analyse"
+@rendermode InteractiveServer
+
+
+<!-- Main Content -->
+<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="pt-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="dashboard" class="text-decoration-none">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Analyse</li>
+        </ol>
+    </nav>
+
+    <h1 class="h2 mb-4">Datafilters</h1>
+
+    <!-- Filters Section -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Datafilters</h5>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label for="periode" class="form-label">Periode</label>
+                    <select class="form-select" id="periode" name="periode">
+                        <option value="">Selecteer datumbereik</option>
+                        <option value="week">Deze week</option>
+                        <option value="month">Deze maand</option>
+                        <option value="year">Dit jaar</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="locatie" class="form-label">Locatie</label>
+                    <select class="form-select" id="locatie" name="locatie">
+                        <option value="">Kies locatie</option>
+                        <option value="amsterdam">Amsterdam</option>
+                        <option value="rotterdam">Rotterdam</option>
+                        <option value="utrecht">Utrecht</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="afvalcategorie" class="form-label">Afvalcategorie</label>
+                    <select class="form-select" id="afvalcategorie" name="afvalcategorie">
+                        <option value="">Selecteer categorie</option>
+                        <option value="plastic">Plastic</option>
+                        <option value="papier">Papier</option>
+                        <option value="gft">GFT</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-primary">Toepassen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Section -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Overzicht afvaldata</h5>
+
+            <!-- Chart Tabs -->
+            <ul class="nav nav-tabs chart-tabs mb-3" id="chartTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="typeverdeling-tab" data-bs-toggle="tab" data-bs-target="#typeverdeling" type="button" role="tab">
+                        Typeverdeling
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="frequentie-tab" data-bs-toggle="tab" data-bs-target="#frequentie" type="button" role="tab">
+                        Frequentie
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="correlaties-tab" data-bs-toggle="tab" data-bs-target="#correlaties" type="button" role="tab">
+                        Correlaties
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content" id="chartTabContent">
+                <div class="tab-pane fade show active" id="typeverdeling" role="tabpanel">
+                    <h6 class="mb-3">Typeverdeling afval</h6>
+                    <div class="chart-container px-3 py-3">
+                        @{
+                            var chartData = new[] {
+                        new { Label = "Restafval", Value = 35 },
+                        new { Label = "GFT", Value = 28 },
+                        new { Label = "Papier", Value = 22 },
+                        new { Label = "Plastic", Value = 18 },
+                        new { Label = "Glas", Value = 12 },
+                        new { Label = "PMD", Value = 15 },
+                        new { Label = "Textiel", Value = 8 },
+                        new { Label = "Metaal", Value = 6 },
+                        new { Label = "Elektronisch", Value = 4 },
+                        new { Label = "Grof Vuil", Value = 10 },
+                        new { Label = "Bouw", Value = 7 },
+                        new { Label = "Gevaarlijk", Value = 3 }
+                        };
+                        }
+
+                        @foreach (var item in chartData)
+                        {
+                            <div class="d-flex flex-column align-items-center">
+                                <small class="chart-label mb-2">@item.Label</small>
+                                <div class="chart-bar"
+                                     style="height: @(item.Value * 4)px;"
+                                     data-bs-toggle="tooltip"
+                                     data-bs-placement="top"
+                                     title="@item.Label: @item.Value%">
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="frequentie" role="tabpanel">
+                    <h6 class="mb-3">Frequentieanalyse</h6>
+                    <div class="chart-container px-3 py-3">
+                        @{
+                            var frequencyData = new[] {
+                        new { Label = "Ma", Value = 25 },
+                        new { Label = "Di", Value = 30 },
+                        new { Label = "Wo", Value = 35 },
+                        new { Label = "Do", Value = 45 },
+                        new { Label = "Vr", Value = 55 },
+                        new { Label = "Za", Value = 40 },
+                        new { Label = "Zo", Value = 20 },
+                        new { Label = "Gem", Value = 35 },
+                        new { Label = "Max", Value = 50 },
+                        new { Label = "Min", Value = 15 },
+                        new { Label = "Totaal", Value = 90 },
+                        new { Label = "Trend", Value = 65 }
+                        };
+                        }
+
+                        @foreach (var item in frequencyData)
+                        {
+                            <div class="d-flex flex-column align-items-center">
+                                <div class="chart-bar" style="height: @(item.Value * 2)px;" data-bs-toggle="tooltip" title="@item.Label: @item.Value"></div>
+                                <small class="chart-label mt-2">@item.Label</small>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="correlaties" role="tabpanel">
+                    <h6 class="mb-3">Correlatie: Weer & Afval</h6>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Correlatie-analyse wordt geladen...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Correlatie Section -->
+    <h5 class="mb-3">Correlatie: Weer & Afval</h5>
+
+    <!-- Insights -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <span class="badge insight-badge mb-2">Inzicht</span>
+            <h6 class="card-title">Hogere volumes bij regen</h6>
+            <p class="card-text text-muted">
+                Er is een duidelijke stijging in afvalvolume op regenachtige dagen. Overweeg extra inzameling bij slecht weer.
+            </p>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <span class="badge insight-badge mb-2">Inzicht</span>
+            <h6 class="card-title">Temperatuur en afval</h6>
+            <p class="card-text text-muted">
+                Hogere temperaturen leiden tot meer GFT-afval. Aanpassing van de planning aanbevolen in de zomer.
+            </p>
+        </div>
+    </div>
+</main>
+
+
+<script>
+    // Initialize Bootstrap tooltips
+    document.addEventListener('DOMContentLoaded', function() {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+
+    // Filter functionality
+    document.querySelector('.btn-primary').addEventListener('click', function() {
+        // Implement filter logic here
+        console.log('Filters applied');
+
+        // Show loading state
+        this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Laden...';
+
+        // Simulate API call
+        setTimeout(() => {
+            this.innerHTML = 'Toepassen';
+        }, 1500);
+    });
+</script>
