@@ -1,5 +1,4 @@
-﻿version: "3.9"
-
+version: "3.9"
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -9,7 +8,7 @@ services:
     ports:
       - "1433:1433"
     restart: unless-stopped
-
+    
   wastewatchai:
     image: mcr.microsoft.com/dotnet/sdk:8.0
     depends_on:
@@ -17,14 +16,16 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=
-      - .:/src
-    working_dir: /src
+    volumes:
+      - ./WasteWatchAIBackend:/app
+    working_dir: /app
     command: >
-      sh -c "dotnet watch --non-interactive --project WasteWatchAIBackend.csproj run --urls=http://0.0.0.0:8080"
+      sh -c "dotnet restore WasteWatchAIBackend.csproj --force && 
+             dotnet watch --non-interactive --project WasteWatchAIBackend.csproj run --urls=http://0.0.0.0:8080"
     ports:
       - "8080:8080"
     restart: unless-stopped
-
+    
   fastapi:
     build:
       context: ./WasteWatchAIFastApi
