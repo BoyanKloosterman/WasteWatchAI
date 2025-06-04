@@ -4,7 +4,7 @@ services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
-      SA_PASSWORD: ""
+      SA_PASSWORD: "MijnSterkWachtwoord123!"
       ACCEPT_EULA: "Y"
     ports:
       - "1433:1433"
@@ -16,9 +16,10 @@ services:
       - sqlserver
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=WasteWatchAIBackend;User Id=sa;Password=MijnSterkWachtwoord123!;TrustServerCertificate=True
+    volumes:
       - .:/src
-    working_dir: /src
+    working_dir: /src/WasteWatchAIBackend
     command: >
       sh -c "dotnet watch --non-interactive --project WasteWatchAIBackend.csproj run --urls=http://0.0.0.0:8080"
     ports:

@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using WasteWatchAIBackend.Model;
 
 namespace WasteWatchAIBackend.Data
 {
@@ -7,6 +8,8 @@ namespace WasteWatchAIBackend.Data
         public WasteWatchDbContext(DbContextOptions<WasteWatchDbContext> options)
             : base(options)
         {
+
         }
+        public DbSet<Weather> Weather { get; set; }
     }
 }
