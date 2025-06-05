@@ -25,13 +25,13 @@ namespace WasteWatchAIBackend.Controller
             _httpClient = httpClientFactory.CreateClient();
         }
 
-        [HttpPost("fetch-latest")]
-        public async Task<IActionResult> FetchAndStoreLatestWeather()
+        [HttpPost("fetch")]
+        public async Task<IActionResult> FetchAndStoreWeather([FromBody] WeatherRequest request)
         {
-            float latitude = 51.57f;
-            float longitude = 4.76f;
+            string startDate = request.StartDate.ToString("yyyy-MM-dd");
+            string endDate = request.EndDate.ToString("yyyy-MM-dd");
 
-            string apiUrl = $"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code";
+            string apiUrl = $"https://api.open-meteo.com/v1/forecast?latitude={request.Latitude}&longitude={request.Longitude}&start_date={startDate}&end_date={endDate}&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto";
 
             var response = await _httpClient.GetAsync(apiUrl);
             if (!response.IsSuccessStatusCode)
@@ -40,21 +40,40 @@ namespace WasteWatchAIBackend.Controller
             var json = await response.Content.ReadAsStringAsync();
             var data = JsonDocument.Parse(json).RootElement;
 
-            var current = data.GetProperty("current");
+            if (!data.TryGetProperty("daily", out var dailyData))
+                return BadRequest("Geen dagelijkse data gevonden in de API-respons.");
 
-            var weather = new Weather
+            var dates = dailyData.GetProperty("time").EnumerateArray().ToList();
+            var maxTemps = dailyData.GetProperty("temperature_2m_max").EnumerateArray().ToList();
+            var minTemps = dailyData.GetProperty("temperature_2m_min").EnumerateArray().ToList();
+            var weatherCodes = dailyData.GetProperty("weather_code").EnumerateArray().ToList();
+
+            var weatherList = new List<Weather>();
+
+            for (int i = 0; i < dates.Count; i++)
             {
-                Timestamp = DateTime.UtcNow,
-                Latitude = latitude,
-                Longitude = longitude,
-                temperatuur = current.GetProperty("temperature_2m").GetSingle(),
-                weerOmschrijving = WeatherCodeToDescription(current.GetProperty("weather_code").GetInt32())
-            };
+                float avgTemp = (maxTemps[i].GetSingle() + minTemps[i].GetSingle()) / 2;
 
-            await _repository.SaveWeatherAsync(weather);
+                var weather = new Weather
+                {
+                    Timestamp = DateTime.Parse(dates[i].GetString()).ToUniversalTime(),
+                    Latitude = request.Latitude,
+                    Longitude = request.Longitude,
+                    temperatuur = avgTemp,
+                    weerOmschrijving = WeatherCodeToDescription(weatherCodes[i].GetInt32())
+                };
 
-            return Ok(weather);
+                weatherList.Add(weather);
+            }
+
+            foreach (var w in weatherList)
+            {
+                await _repository.SaveWeatherAsync(w);
+            }
+
+            return Ok(weatherList);
         }
+
 
 
         [HttpGet]
