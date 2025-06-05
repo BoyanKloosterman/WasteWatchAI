@@ -41,5 +41,19 @@ namespace WasteWatchAIBackend.Controllers
             return CreatedAtAction(nameof(GetTrashItem), new { id = item.Id }, item);
         }
 
+        [HttpGet("Filter/{littertype}")]
+        public async Task<ActionResult<IEnumerable<TrashItem>>> FilterTrashItems([FromQuery] string litterType)
+        {
+            if (string.IsNullOrWhiteSpace(litterType))
+            {
+                return BadRequest("Query parameter 'litterType' is required.");
+            }
+
+            var filtered = await _context.TrashItems
+                .Where(t => t.LitterType.ToLower() == litterType.ToLower())
+                .ToListAsync();
+
+            return Ok(filtered);
+        }
     }
 }
