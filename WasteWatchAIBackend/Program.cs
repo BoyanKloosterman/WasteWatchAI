@@ -3,6 +3,7 @@ using WasteWatchAIBackend.Data;
 using WasteWatchAIBackend.Interface;
 using WasteWatchAIBackend.Repository;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration
@@ -19,6 +20,9 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddDbContext<WasteWatchDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 

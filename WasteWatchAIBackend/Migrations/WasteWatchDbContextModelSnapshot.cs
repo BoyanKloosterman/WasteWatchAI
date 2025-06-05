@@ -22,6 +22,65 @@ namespace WasteWatchAIBackend.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("WasteWatchAIBackend.Models.PredictionResult", b =>
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uniqueidentifier");
+
+                b.Property<string>("FeatureLocationType")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<float>("FeatureTemp")
+                    .HasColumnType("real");
+
+                b.Property<string>("FeatureWeather")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<float>("Latitude")
+                    .HasColumnType("real");
+
+                b.Property<float>("Longitude")
+                    .HasColumnType("real");
+
+                b.Property<string>("Prediction")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<DateTime>("Timestamp")
+                    .HasColumnType("datetime2");
+
+                b.HasKey("Id");
+
+                b.ToTable("PredictionResults");
+            });
+
+            modelBuilder.Entity("WasteWatchAIBackend.Models.TrashItem", b =>
+            {
+                b.Property<Guid>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uniqueidentifier");
+
+                b.Property<float>("Latitude")
+                    .HasColumnType("real");
+
+                b.Property<string>("LitterType")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<float>("Longitude")
+                    .HasColumnType("real");
+
+                b.Property<DateTime>("Timestamp")
+                    .HasColumnType("datetime2");
+
+                b.HasKey("Id");
+
+                b.ToTable("TrashItems");
+            });
+
             modelBuilder.Entity("WasteWatchAIBackend.Model.Weather", b =>
                 {
                     b.Property<int>("Id")
