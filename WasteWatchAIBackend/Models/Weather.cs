@@ -1,4 +1,4 @@
-﻿namespace WasteWatchAIBackend.Model
+﻿namespace WasteWatchAIBackend.Models
 {
     public class Weather
     {

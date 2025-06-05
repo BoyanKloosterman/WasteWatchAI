@@ -1,7 +1,7 @@
 ﻿using WasteWatchAIBackend.Data;
 using System;
 using WasteWatchAIBackend.Interface;
-using WasteWatchAIBackend.Model;
+using WasteWatchAIBackend.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace WasteWatchAIBackend.Repository

@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using WasteWatchAIBackend.Model;
+using WasteWatchAIBackend.Models;
 
 namespace WasteWatchAIBackend.Data
 {

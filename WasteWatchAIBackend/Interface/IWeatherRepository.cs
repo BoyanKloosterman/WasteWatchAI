@@ -1,4 +1,4 @@
-﻿using WasteWatchAIBackend.Model;
+﻿using WasteWatchAIBackend.Models;
 
 namespace WasteWatchAIBackend.Interface
 {
