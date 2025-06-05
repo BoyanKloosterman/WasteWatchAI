@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using WasteWatchAIBackend.Data;
 using WasteWatchAIBackend.Interface;
-using WasteWatchAIBackend.Model;
+using WasteWatchAIBackend.Models;
 
 namespace WasteWatchAIBackend.Controller
 {
