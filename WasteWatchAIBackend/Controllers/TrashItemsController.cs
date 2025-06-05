@@ -29,5 +29,17 @@ namespace WasteWatchAIBackend.Controllers
             if (item == null) return NotFound();
             return item;
         }
+
+        [HttpPost]
+        public async Task<ActionResult<TrashItem>> PostTrashItem(TrashItem item)
+        {
+            item.Id = Guid.NewGuid();
+            item.Timestamp = DateTime.UtcNow;
+            _context.TrashItems.Add(item);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetTrashItem), new { id = item.Id }, item);
+        }
+
     }
 }
