@@ -575,3 +575,6 @@ FodyWeavers.xsd
 ## Docker ##
 docker-compose.override.yml
 # End of https://www.toptal.com/developers/gitignore/api/visualstudio,python
+/.github/workflows/github_workflow_simplified.yml
+/docker-compose.yml
+/docker-compose.yml
