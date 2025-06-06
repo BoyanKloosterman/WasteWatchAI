@@ -1,4 +1,18 @@
 ﻿/* Charts specific styling */
+/* ...existing code... */
+
+/* Typeverdling SVG Charts */
+.typeverdling-svg-charts {
+    display: flex;
+    flex-direction: row; /* Changed from column to row */
+    gap: 2rem;
+    overflow-x: auto; /* Allow horizontal scrolling if needed */
+    align-items: flex-start;
+    width: 100%;
+    padding-bottom: 8px;
+}
+
+/* ...rest of existing code... */
 .chart-container {
     display: flex;
     justify-content: space-around;
@@ -166,5 +180,58 @@
 
     .frequency-chart-container {
         padding: 15px;
+    }
+}
+
+/* Typeverdling SVG Charts */
+.typeverdling-svg-charts {
+    display: flex;
+    flex-direction: row; /* Changed from column to row */
+    gap: 2rem;
+    overflow-x: auto; /* Allow horizontal scrolling if needed */
+    align-items: flex-start;
+    width: 100%;
+    padding-bottom: 8px;
+}
+
+.typeverdling-svg {
+    background: #fafbfc;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    margin-bottom: 0.5rem;
+    width: 100%;
+    min-width: 1200px; /* was 700px */
+    max-width: 2000px; /* was 1200px */
+}
+
+    .typeverdling-svg text {
+        font-family: 'Segoe UI', Arial, sans-serif;
+    }
+
+    .typeverdling-svg rect {
+        transition: fill 0.2s, height 0.2s;
+        cursor: pointer;
+    }
+
+        .typeverdling-svg rect:hover {
+            opacity: 0.85;
+            filter: brightness(1.1);
+        }
+
+.typeverdling-location-label {
+    font-weight: 500;
+    fill: #444;
+    font-size: 13px;
+}
+
+.typeverdling-wastetype-label {
+    font-size: 11px;
+    fill: #888;
+}
+
+@media (max-width: 900px) {
+    .typeverdling-svg {
+        min-width: 900px;
+        max-width: 100vw;
     }
 }
