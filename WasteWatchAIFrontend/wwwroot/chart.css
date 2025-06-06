@@ -134,6 +134,8 @@
     padding: 20px;
     margin: 20px 0;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    max-width: 1220px; /* NEW: allow wider chart + padding */
+    overflow-x: auto;
 }
 
 .frequency-chart-header h6 {
@@ -145,7 +147,10 @@
 .frequency-svg {
     width: 100%;
     height: auto;
-    max-height: 350px;
+    max-width: 1200px; /* NEW: allow SVG to be wider */
+    min-width: 800px; /* Optional: ensure minimum width for usability */
+    display: block;
+    margin: 0 auto;
 }
 
 .frequency-point {

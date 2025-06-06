@@ -98,7 +98,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                                                .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                                    .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
@@ -107,13 +107,22 @@
 
         locationChartData = locationGroups;
 
-        // Process frequency data - count by hour of day
+        // Process frequency data - count by hour of previous day (00:00 to 23:00)
         var hourlyFrequency = new List<FrequencyDataItem>();
 
-        // Create hourly buckets from 06:00 to 22:00
-        for (int hour = 6; hour <= 22; hour++)
+        // Get the previous day's date (midnight to midnight)
+        var prevDay = DateTime.Now.Date.AddDays(-1);
+        var prevDayEnd = prevDay.AddDays(1);
+
+        // Only consider trashItems from the previous day
+        var prevDayItems = trashItems
+            .Where(item => item.Timestamp >= prevDay && item.Timestamp < prevDayEnd)
+            .ToList();
+
+        // Create hourly buckets for 00:00 to 23:00
+        for (int hour = 0; hour < 24; hour++)
         {
-            var count = trashItems.Count(item => item.Timestamp.Hour == hour);
+            var count = prevDayItems.Count(item => item.Timestamp.Hour == hour);
             hourlyFrequency.Add(new FrequencyDataItem
                 {
                     Label = $"{hour:D2}:00",
