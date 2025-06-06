@@ -211,13 +211,19 @@
     }
 
     .typeverdling-svg rect {
-        transition: fill 0.2s, height 0.2s;
+        transition: fill 0.2s, height 0.2s, stroke 0.2s, filter 0.2s;
         cursor: pointer;
+        /* Add outline for accessibility on focus */
+        outline: none;
     }
 
-        .typeverdling-svg rect:hover {
-            opacity: 0.85;
-            filter: brightness(1.1);
+        .typeverdling-svg rect:hover,
+        .typeverdling-svg rect:focus {
+            opacity: 0.95;
+            filter: brightness(1.15) drop-shadow(0 0 6px #bbb);
+            stroke: #222;
+            stroke-width: 2;
+            z-index: 2;
         }
 
 .typeverdling-location-label {

@@ -3,7 +3,7 @@
 @using System.Net.Http.Json
 @using System.ComponentModel.DataAnnotations
 @inject IHttpClientFactory HttpClientFactory
-@inject IJSRuntime JSRuntime
+@inject IJSRuntime JS
 
 @code {
     // Models
@@ -74,6 +74,18 @@
             isLoading = false;
         }
     }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!isLoading)
+        {
+            await JS.InvokeVoidAsync("eval", @"
+                   var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle=""tooltip""]'));
+                   tooltipTriggerList.map(function (tooltipTriggerEl) {
+                       return new bootstrap.Tooltip(tooltipTriggerEl);
+                   });
+               ");
+        }
+    }
 
     private async Task ProcessData()
     {
@@ -86,7 +98,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                        .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                                .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
@@ -321,7 +333,7 @@
             var y = chartHeight - padding - height;
             var color = wasteTypeColors.GetValueOrDefault(wasteType, "#95a5a6");
 
-            bars.Add($@"<rect x=""{x}"" y=""{y}"" width=""{barWidth - 8}"" height=""{height}"" fill=""{color}"" rx=""4"" data-bs-toggle=""tooltip"" title=""{wasteType}: {count} items"" />");
+            bars.Add($@"<rect x=""{x}"" y=""{y}"" width=""{barWidth - 8}"" height=""{height}"" fill=""{color}"" rx=""4"" data-bs-toggle=""tooltip"" title=""{wasteType}: {count}"" />");
         }
 
         return string.Join("\n", bars);
@@ -388,7 +400,8 @@
                 var y = paddingTop + chartHeight - height;
                 var color = wasteTypeColors.GetValueOrDefault(wasteType, "#95a5a6");
 
-                svg.AppendLine($@"<rect x=""{x}"" y=""{y}"" width=""{barWidth}"" height=""{height}"" fill=""{color}"" rx=""4"" data-bs-toggle=""tooltip"" title=""{location.LocationName} - {wasteType}: {count} items"" />");
+                // CHANGED: Tooltip now only shows "{WasteType}: {count}"
+                svg.AppendLine($@"<rect x=""{x}"" y=""{y}"" width=""{barWidth}"" height=""{height}"" fill=""{color}"" rx=""4"" data-bs-toggle=""tooltip"" title=""{wasteType}: {count}"" />");
             }
         }
 
@@ -408,7 +421,7 @@
     }
 }
 
-<!-- Main Content -->
+// Main Content
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="pt-3">
@@ -679,8 +692,8 @@
     }
 </main>
 
-
 <link href="css/chart.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
