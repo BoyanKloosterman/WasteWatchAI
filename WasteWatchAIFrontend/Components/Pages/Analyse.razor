@@ -1,6 +1,198 @@
 ﻿@page "/analyse"
 @rendermode InteractiveServer
+@using System.Net.Http.Json
+@using System.ComponentModel.DataAnnotations
+@inject IHttpClientFactory HttpClientFactory
+@inject IJSRuntime JSRuntime
 
+@code {
+    // Models
+    public class DummyTrashItem
+    {
+        public Guid Id { get; set; }
+        public string LitterType { get; set; } = string.Empty;
+        public float Latitude { get; set; }
+        public float Longitude { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+
+    public class ChartDataItem
+    {
+        public string Label { get; set; } = string.Empty;
+        public int Value { get; set; }
+    }
+
+    public class FrequencyDataItem
+    {
+        public string Label { get; set; } = string.Empty;
+        public int Value { get; set; }
+    }
+
+    // State variables
+    private List<DummyTrashItem> trashItems = new();
+    private List<ChartDataItem> chartData = new();
+    private List<FrequencyDataItem> frequencyData = new();
+    private bool isLoading = true;
+    private string selectedPeriod = string.Empty;
+    private string selectedLocation = string.Empty;
+    private string selectedCategory = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTrashData();
+        await ProcessData();
+    }
+
+    private async Task LoadTrashData()
+    {
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
+            // Now you can use relative URLs since base address is configured
+            var response = await httpClient.GetAsync("api/dummytrashitems");
+            if (response.IsSuccessStatusCode)
+            {
+                trashItems = await response.Content.ReadFromJsonAsync<List<DummyTrashItem>>() ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Handle error - you might want to show an error message to the user
+            Console.WriteLine($"Error loading trash data: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ProcessData()
+    {
+        if (!trashItems.Any()) return;
+
+        // Process chart data - count by litter type
+        var litterTypeCounts = trashItems
+            .GroupBy(item => item.LitterType)
+            .Select(group => new ChartDataItem
+                {
+                    Label = group.Key,
+                    Value = group.Count()
+                })
+            .OrderByDescending(item => item.Value)
+            .ToList();
+
+        chartData = litterTypeCounts;
+
+        // Process frequency data - count by day of week
+        var dayFrequency = trashItems
+            .GroupBy(item => item.Timestamp.DayOfWeek)
+            .Select(group => new FrequencyDataItem
+                {
+                    Label = GetDayAbbreviation(group.Key),
+                    Value = group.Count()
+                })
+            .OrderBy(item => GetDayOrder(item.Label))
+            .ToList();
+
+        // Add summary statistics
+        var totalItems = trashItems.Count;
+        var avgPerDay = totalItems / 7;
+        var maxDay = dayFrequency.MaxBy(d => d.Value)?.Value ?? 0;
+        var minDay = dayFrequency.MinBy(d => d.Value)?.Value ?? 0;
+
+        dayFrequency.AddRange(new[]
+        {
+            new FrequencyDataItem { Label = "Gem", Value = avgPerDay },
+            new FrequencyDataItem { Label = "Max", Value = maxDay },
+            new FrequencyDataItem { Label = "Min", Value = minDay },
+            new FrequencyDataItem { Label = "Totaal", Value = Math.Min(totalItems, 100) }, // Scale for display
+        });
+
+        frequencyData = dayFrequency;
+    }
+
+    private string GetDayAbbreviation(DayOfWeek day)
+    {
+        return day switch
+        {
+            DayOfWeek.Monday => "Ma",
+            DayOfWeek.Tuesday => "Di",
+            DayOfWeek.Wednesday => "Wo",
+            DayOfWeek.Thursday => "Do",
+            DayOfWeek.Friday => "Vr",
+            DayOfWeek.Saturday => "Za",
+            DayOfWeek.Sunday => "Zo",
+            _ => day.ToString()
+        };
+    }
+
+    private int GetDayOrder(string dayAbbr)
+    {
+        return dayAbbr switch
+        {
+            "Ma" => 1,
+            "Di" => 2,
+            "Wo" => 3,
+            "Do" => 4,
+            "Vr" => 5,
+            "Za" => 6,
+            "Zo" => 7,
+            _ => 8
+        };
+    }
+
+    private async Task ApplyFilters()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        // Filter the data based on selected criteria
+        var filteredItems = trashItems.AsEnumerable();
+
+        // Apply period filter
+        if (!string.IsNullOrEmpty(selectedPeriod))
+        {
+            var now = DateTime.Now;
+            filteredItems = selectedPeriod switch
+            {
+                "week" => filteredItems.Where(item => item.Timestamp >= now.AddDays(-7)),
+                "month" => filteredItems.Where(item => item.Timestamp >= now.AddMonths(-1)),
+                "year" => filteredItems.Where(item => item.Timestamp >= now.AddYears(-1)),
+                _ => filteredItems
+            };
+        }
+
+        // Apply category filter
+        if (!string.IsNullOrEmpty(selectedCategory))
+        {
+            var categoryMap = new Dictionary<string, string>
+            {
+                { "plastic", "Plastic" },
+                { "papier", "Papier" },
+                { "gft", "Organisch" }
+            };
+
+            if (categoryMap.TryGetValue(selectedCategory, out var actualCategory))
+            {
+                filteredItems = filteredItems.Where(item =>
+                    item.LitterType.Equals(actualCategory, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        // Update the working dataset
+        var originalItems = trashItems;
+        trashItems = filteredItems.ToList();
+
+        await ProcessData();
+
+        // Restore original data for future filtering
+        trashItems = originalItems;
+
+        await Task.Delay(500); // Simulate processing time
+        isLoading = false;
+        StateHasChanged();
+    }
+}
 
 <!-- Main Content -->
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
@@ -14,172 +206,195 @@
 
     <h1 class="h2 mb-4">Datafilters</h1>
 
-    <!-- Filters Section -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Datafilters</h5>
-            <div class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label for="periode" class="form-label">Periode</label>
-                    <select class="form-select" id="periode" name="periode">
-                        <option value="">Selecteer datumbereik</option>
-                        <option value="week">Deze week</option>
-                        <option value="month">Deze maand</option>
-                        <option value="year">Dit jaar</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label for="locatie" class="form-label">Locatie</label>
-                    <select class="form-select" id="locatie" name="locatie">
-                        <option value="">Kies locatie</option>
-                        <option value="amsterdam">Amsterdam</option>
-                        <option value="rotterdam">Rotterdam</option>
-                        <option value="utrecht">Utrecht</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label for="afvalcategorie" class="form-label">Afvalcategorie</label>
-                    <select class="form-select" id="afvalcategorie" name="afvalcategorie">
-                        <option value="">Selecteer categorie</option>
-                        <option value="plastic">Plastic</option>
-                        <option value="papier">Papier</option>
-                        <option value="gft">GFT</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <button type="button" class="btn btn-primary">Toepassen</button>
-                </div>
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
         </div>
-    </div>
-
-    <!-- Chart Section -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Overzicht afvaldata</h5>
-
-            <!-- Chart Tabs -->
-            <ul class="nav nav-tabs chart-tabs mb-3" id="chartTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="typeverdeling-tab" data-bs-toggle="tab" data-bs-target="#typeverdeling" type="button" role="tab">
-                        Typeverdeling
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="frequentie-tab" data-bs-toggle="tab" data-bs-target="#frequentie" type="button" role="tab">
-                        Frequentie
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="correlaties-tab" data-bs-toggle="tab" data-bs-target="#correlaties" type="button" role="tab">
-                        Correlaties
-                    </button>
-                </li>
-            </ul>
-
-            <!-- Tab Content -->
-            <div class="tab-content" id="chartTabContent">
-                <div class="tab-pane fade show active" id="typeverdeling" role="tabpanel">
-                    <h6 class="mb-3">Typeverdeling afval</h6>
-                    <div class="chart-container px-3 py-3">
-                        @{
-                            var chartData = new[] {
-                        new { Label = "Restafval", Value = 35 },
-                        new { Label = "GFT", Value = 28 },
-                        new { Label = "Papier", Value = 22 },
-                        new { Label = "Plastic", Value = 18 },
-                        new { Label = "Glas", Value = 12 },
-                        new { Label = "PMD", Value = 15 },
-                        new { Label = "Textiel", Value = 8 },
-                        new { Label = "Metaal", Value = 6 },
-                        new { Label = "Elektronisch", Value = 4 },
-                        new { Label = "Grof Vuil", Value = 10 },
-                        new { Label = "Bouw", Value = 7 },
-                        new { Label = "Gevaarlijk", Value = 3 }
-                        };
-                        }
-
-                        @foreach (var item in chartData)
-                        {
-                            <div class="d-flex flex-column align-items-center">
-                                <small class="chart-label mb-2">@item.Label</small>
-                                <div class="chart-bar"
-                                     style="height: @(item.Value * 4)px;"
-                                     data-bs-toggle="tooltip"
-                                     data-bs-placement="top"
-                                     title="@item.Label: @item.Value%">
-                                </div>
-                            </div>
-                        }
+    }
+    else
+    {
+        <!-- Filters Section -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Datafilters</h5>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label for="periode" class="form-label">Periode</label>
+                        <select class="form-select" id="periode" @bind="selectedPeriod">
+                            <option value="">Selecteer datumbereik</option>
+                            <option value="week">Deze week</option>
+                            <option value="month">Deze maand</option>
+                            <option value="year">Dit jaar</option>
+                        </select>
                     </div>
-                </div>
-
-                <div class="tab-pane fade" id="frequentie" role="tabpanel">
-                    <h6 class="mb-3">Frequentieanalyse</h6>
-                    <div class="chart-container px-3 py-3">
-                        @{
-                            var frequencyData = new[] {
-                        new { Label = "Ma", Value = 25 },
-                        new { Label = "Di", Value = 30 },
-                        new { Label = "Wo", Value = 35 },
-                        new { Label = "Do", Value = 45 },
-                        new { Label = "Vr", Value = 55 },
-                        new { Label = "Za", Value = 40 },
-                        new { Label = "Zo", Value = 20 },
-                        new { Label = "Gem", Value = 35 },
-                        new { Label = "Max", Value = 50 },
-                        new { Label = "Min", Value = 15 },
-                        new { Label = "Totaal", Value = 90 },
-                        new { Label = "Trend", Value = 65 }
-                        };
-                        }
-
-                        @foreach (var item in frequencyData)
-                        {
-                            <div class="d-flex flex-column align-items-center">
-                                <div class="chart-bar" style="height: @(item.Value * 2)px;" data-bs-toggle="tooltip" title="@item.Label: @item.Value"></div>
-                                <small class="chart-label mt-2">@item.Label</small>
-                            </div>
-                        }
+                    <div class="col-md-3">
+                        <label for="locatie" class="form-label">Locatie</label>
+                        <select class="form-select" id="locatie" @bind="selectedLocation">
+                            <option value="">Kies locatie</option>
+                            <option value="amsterdam">Amsterdam</option>
+                            <option value="rotterdam">Rotterdam</option>
+                            <option value="utrecht">Utrecht</option>
+                        </select>
                     </div>
-                </div>
-
-                <div class="tab-pane fade" id="correlaties" role="tabpanel">
-                    <h6 class="mb-3">Correlatie: Weer & Afval</h6>
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>
-                        Correlatie-analyse wordt geladen...
+                    <div class="col-md-3">
+                        <label for="afvalcategorie" class="form-label">Afvalcategorie</label>
+                        <select class="form-select" id="afvalcategorie" @bind="selectedCategory">
+                            <option value="">Selecteer categorie</option>
+                            <option value="plastic">Plastic</option>
+                            <option value="papier">Papier</option>
+                            <option value="gft">GFT/Organisch</option>
+                            <option value="glas">Glas</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-primary" @onclick="ApplyFilters" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <text>Laden...</text>
+                            }
+                            else
+                            {
+                                <text>Toepassen</text>
+                            }
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Correlatie Section -->
-    <h5 class="mb-3">Correlatie: Weer & Afval</h5>
-
-    <!-- Insights -->
-    <div class="card mb-3">
-        <div class="card-body">
-            <span class="badge insight-badge mb-2">Inzicht</span>
-            <h6 class="card-title">Hogere volumes bij regen</h6>
-            <p class="card-text text-muted">
-                Er is een duidelijke stijging in afvalvolume op regenachtige dagen. Overweeg extra inzameling bij slecht weer.
-            </p>
+        <!-- Data Summary -->
+        <div class="alert alert-info mb-4">
+            <i class="fas fa-info-circle me-2"></i>
+            Totaal @trashItems.Count afvalitems geladen uit de database.
         </div>
-    </div>
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <span class="badge insight-badge mb-2">Inzicht</span>
-            <h6 class="card-title">Temperatuur en afval</h6>
-            <p class="card-text text-muted">
-                Hogere temperaturen leiden tot meer GFT-afval. Aanpassing van de planning aanbevolen in de zomer.
-            </p>
+        <!-- Chart Section -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Overzicht afvaldata</h5>
+
+                <!-- Chart Tabs -->
+                <ul class="nav nav-tabs chart-tabs mb-3" id="chartTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="typeverdeling-tab" data-bs-toggle="tab" data-bs-target="#typeverdeling" type="button" role="tab">
+                            Typeverdeling
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="frequentie-tab" data-bs-toggle="tab" data-bs-target="#frequentie" type="button" role="tab">
+                            Frequentie
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="correlaties-tab" data-bs-toggle="tab" data-bs-target="#correlaties" type="button" role="tab">
+                            Correlaties
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content" id="chartTabContent">
+                    <div class="tab-pane fade show active" id="typeverdeling" role="tabpanel">
+                        <h6 class="mb-3">Typeverdeling afval</h6>
+                        @if (chartData.Any())
+                        {
+                            <div class="chart-container px-3 py-3">
+                                @foreach (var item in chartData)
+                                {
+                                    var percentage = trashItems.Count > 0 ? (item.Value * 100 / trashItems.Count) : 0;
+                                    <div class="d-flex flex-column align-items-center">
+                                        <small class="chart-label mb-2">@item.Label</small>
+                                        <div class="chart-bar"
+                                             style="height: @(item.Value * 4)px;"
+                                             data-bs-toggle="tooltip"
+                                             data-bs-placement="top"
+                                             title="@item.Label: @item.Value items (@percentage.ToString("F1")%)">
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning">
+                                Geen data beschikbaar voor typeverdeling.
+                            </div>
+                        }
+                    </div>
+
+                    <div class="tab-pane fade" id="frequentie" role="tabpanel">
+                        <h6 class="mb-3">Frequentieanalyse</h6>
+                        @if (frequencyData.Any())
+                        {
+                            <div class="chart-container px-3 py-3">
+                                @foreach (var item in frequencyData)
+                                {
+                                    <div class="d-flex flex-column align-items-center">
+                                        <div class="chart-bar"
+                                             style="height: @(Math.Max(item.Value * 2, 10))px;"
+                                             data-bs-toggle="tooltip"
+                                             title="@item.Label: @item.Value">
+                                        </div>
+                                        <small class="chart-label mt-2">@item.Label</small>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning">
+                                Geen data beschikbaar voor frequentieanalyse.
+                            </div>
+                        }
+                    </div>
+
+                    <div class="tab-pane fade" id="correlaties" role="tabpanel">
+                        <h6 class="mb-3">Correlatie: Weer & Afval</h6>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Correlatie-analyse wordt geladen...
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
+
+        <!-- Dynamic Insights based on real data -->
+        <h5 class="mb-3">Data Inzichten</h5>
+
+        @if (chartData.Any())
+        {
+            var mostCommonType = chartData.First();
+            <div class="card mb-3">
+                <div class="card-body">
+                    <span class="badge insight-badge mb-2">Inzicht</span>
+                    <h6 class="card-title">Meest voorkomend afvaltype</h6>
+                    <p class="card-text text-muted">
+                        @mostCommonType.Label is het meest voorkomende afvaltype met @mostCommonType.Value items (@((mostCommonType.Value * 100 / trashItems.Count).ToString("F1"))% van het totaal).
+                    </p>
+                </div>
+            </div>
+        }
+
+        @if (trashItems.Any())
+        {
+            var recentItems = trashItems.Where(item => item.Timestamp >= DateTime.Now.AddDays(-7)).Count();
+            <div class="card mb-4">
+                <div class="card-body">
+                    <span class="badge insight-badge mb-2">Inzicht</span>
+                    <h6 class="card-title">Recente activiteit</h6>
+                    <p class="card-text text-muted">
+                        In de afgelopen week zijn er @recentItems nieuwe afvalitems geregistreerd.
+                    </p>
+                </div>
+            </div>
+        }
+    }
 </main>
-
 
 <script>
     // Initialize Bootstrap tooltips
@@ -188,19 +403,5 @@
         var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
-    });
-
-    // Filter functionality
-    document.querySelector('.btn-primary').addEventListener('click', function() {
-        // Implement filter logic here
-        console.log('Filters applied');
-
-        // Show loading state
-        this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Laden...';
-
-        // Simulate API call
-        setTimeout(() => {
-            this.innerHTML = 'Toepassen';
-        }, 1500);
     });
 </script>
