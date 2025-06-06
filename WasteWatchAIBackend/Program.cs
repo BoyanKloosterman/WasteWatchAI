@@ -3,16 +3,7 @@ using WasteWatchAIBackend.Data;
 using WasteWatchAIBackend.Interface;
 using WasteWatchAIBackend.Repository;
 
-
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Configuration
-    .AddUserSecrets<Program>();
-builder.Services.AddDbContext<WasteWatchDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-builder.Services.AddScoped<IWeatherRepository, WeatherRepository>();
-builder.Services.AddHttpClient();
 
 // Add services to the container.
 
@@ -21,8 +12,11 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+
 builder.Services.AddDbContext<WasteWatchDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<IWeatherRepository, WeatherRepository>();
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 

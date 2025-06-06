@@ -35,7 +35,16 @@ namespace WasteWatchAIBackend.Controller
 
             var response = await _httpClient.GetAsync(apiUrl);
             if (!response.IsSuccessStatusCode)
-                return StatusCode((int)response.StatusCode, "Failed to fetch weather data");
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                return StatusCode((int)response.StatusCode, new
+                {
+                    message = "Failed to fetch weather data",
+                    status = response.StatusCode,
+                    error,
+                    url = apiUrl
+                });
+            }
 
             var json = await response.Content.ReadAsStringAsync();
             var data = JsonDocument.Parse(json).RootElement;
@@ -48,19 +57,19 @@ namespace WasteWatchAIBackend.Controller
             var minTemps = dailyData.GetProperty("temperature_2m_min").EnumerateArray().ToList();
             var weatherCodes = dailyData.GetProperty("weather_code").EnumerateArray().ToList();
 
-            var weatherList = new List<Weather>();
+            var weatherList = new List<WeatherData>();
 
             for (int i = 0; i < dates.Count; i++)
             {
                 float avgTemp = (maxTemps[i].GetSingle() + minTemps[i].GetSingle()) / 2;
 
-                var weather = new Weather
+                var weather = new WeatherData
                 {
                     Timestamp = DateTime.Parse(dates[i].GetString()).ToUniversalTime(),
                     Latitude = request.Latitude,
                     Longitude = request.Longitude,
-                    temperatuur = avgTemp,
-                    weerOmschrijving = WeatherCodeToDescription(weatherCodes[i].GetInt32())
+                    Temperature = avgTemp,
+                    WeatherDescription = WeatherCodeToDescription(weatherCodes[i].GetInt32())
                 };
 
                 weatherList.Add(weather);

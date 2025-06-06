@@ -23,71 +23,21 @@ namespace WasteWatchAIBackend.Migrations
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
             modelBuilder.Entity("WasteWatchAIBackend.Models.PredictionResult", b =>
-            {
-                b.Property<Guid>("Id")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("uniqueidentifier");
-
-                b.Property<string>("FeatureLocationType")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
-
-                b.Property<float>("FeatureTemp")
-                    .HasColumnType("real");
-
-                b.Property<string>("FeatureWeather")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
-
-                b.Property<float>("Latitude")
-                    .HasColumnType("real");
-
-                b.Property<float>("Longitude")
-                    .HasColumnType("real");
-
-                b.Property<string>("Prediction")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
-
-                b.Property<DateTime>("Timestamp")
-                    .HasColumnType("datetime2");
-
-                b.HasKey("Id");
-
-                b.ToTable("PredictionResults");
-            });
-
-            modelBuilder.Entity("WasteWatchAIBackend.Models.TrashItem", b =>
-            {
-                b.Property<Guid>("Id")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("uniqueidentifier");
-
-                b.Property<float>("Latitude")
-                    .HasColumnType("real");
-
-                b.Property<string>("LitterType")
-                    .IsRequired()
-                    .HasColumnType("nvarchar(max)");
-
-                b.Property<float>("Longitude")
-                    .HasColumnType("real");
-
-                b.Property<DateTime>("Timestamp")
-                    .HasColumnType("datetime2");
-
-                b.HasKey("Id");
-
-                b.ToTable("TrashItems");
-            });
-
-            modelBuilder.Entity("WasteWatchAIBackend.Model.Weather", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("uniqueidentifier");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    b.Property<string>("FeatureLocationType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<float>("FeatureTemp")
+                        .HasColumnType("real");
+
+                    b.Property<string>("FeatureWeather")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<float>("Latitude")
                         .HasColumnType("real");
@@ -95,19 +45,67 @@ namespace WasteWatchAIBackend.Migrations
                     b.Property<float>("Longitude")
                         .HasColumnType("real");
 
+                    b.Property<string>("Prediction")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("datetime2");
 
-                    b.Property<float>("temperatuur")
+                    b.HasKey("Id");
+
+                    b.ToTable("PredictionResults");
+                });
+
+            modelBuilder.Entity("WasteWatchAIBackend.Models.TrashItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<float>("Latitude")
                         .HasColumnType("real");
 
-                    b.Property<string>("weerOmschrijving")
+                    b.Property<string>("LitterType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<float>("Longitude")
+                        .HasColumnType("real");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TrashItems");
+                });
+
+            modelBuilder.Entity("WasteWatchAIBackend.Models.WeatherData", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<float>("Latitude")
+                        .HasColumnType("real");
+
+                    b.Property<float>("Longitude")
+                        .HasColumnType("real");
+
+                    b.Property<float>("Temperature")
+                        .HasColumnType("real");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WeatherDescription")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Weather");
+                    b.ToTable("WeatherData");
                 });
 #pragma warning restore 612, 618
         }

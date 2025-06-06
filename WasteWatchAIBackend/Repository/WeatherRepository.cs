@@ -15,15 +15,15 @@ namespace WasteWatchAIBackend.Repository
             _context = context;
         }
 
-        public async Task SaveWeatherAsync(Weather data)
+        public async Task SaveWeatherAsync(WeatherData data)
         {
-            _context.Weather.Add(data);
+            _context.WeatherData.Add(data);
             await _context.SaveChangesAsync();
         }
 
-        public async Task<IEnumerable<Weather>> GetAllAsync()
+        public async Task<IEnumerable<WeatherData>> GetAllAsync()
         {
-            return await _context.Weather.OrderByDescending(w => w.Timestamp).ToListAsync();
+            return await _context.WeatherData.OrderByDescending(w => w.Timestamp).ToListAsync();
         }
 
     }
