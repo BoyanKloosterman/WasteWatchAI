@@ -16,26 +16,40 @@
         public DateTime Timestamp { get; set; }
     }
 
-    public class ChartDataItem
+    public class LocationChartData
     {
-        public string Label { get; set; } = string.Empty;
-        public int Value { get; set; }
+        public string LocationName { get; set; } = string.Empty;
+        public Dictionary<string, int> TypeCounts { get; set; } = new();
+        public int TotalCount { get; set; }
     }
 
     public class FrequencyDataItem
     {
         public string Label { get; set; } = string.Empty;
         public int Value { get; set; }
+        public string Time { get; set; } = string.Empty;
     }
 
     // State variables
     private List<DummyTrashItem> trashItems = new();
-    private List<ChartDataItem> chartData = new();
+    private List<LocationChartData> locationChartData = new();
     private List<FrequencyDataItem> frequencyData = new();
     private bool isLoading = true;
     private string selectedPeriod = string.Empty;
     private string selectedLocation = string.Empty;
     private string selectedCategory = string.Empty;
+
+    // Define color mapping for waste types
+    private readonly Dictionary<string, string> wasteTypeColors = new()
+    {
+        { "Plastic", "#e74c3c" },      // Red
+        { "Papier", "#3498db" },       // Blue
+        { "Organisch", "#2ecc71" },    // Green
+        { "Glas", "#f39c12" },         // Orange
+        { "Metaal", "#9b59b6" },       // Purple
+        { "Textiel", "#1abc9c" },      // Teal
+        { "Overig", "#95a5a6" }        // Gray
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -48,7 +62,6 @@
         try
         {
             var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
-            // Now you can use relative URLs since base address is configured
             var response = await httpClient.GetAsync("api/dummytrashitems");
             if (response.IsSuccessStatusCode)
             {
@@ -57,7 +70,6 @@
         }
         catch (Exception ex)
         {
-            // Handle error - you might want to show an error message to the user
             Console.WriteLine($"Error loading trash data: {ex.Message}");
         }
         finally
@@ -70,45 +82,65 @@
     {
         if (!trashItems.Any()) return;
 
-        // Process chart data - count by litter type
-        var litterTypeCounts = trashItems
-            .GroupBy(item => item.LitterType)
-            .Select(group => new ChartDataItem
+        // Process location-based chart data
+        var locationGroups = trashItems
+            .GroupBy(item => GetLocationName(item.Latitude, item.Longitude))
+            .Select(group => new LocationChartData
                 {
-                    Label = group.Key,
-                    Value = group.Count()
+                    LocationName = group.Key,
+                    TypeCounts = group.GroupBy(item => item.LitterType)
+                                             .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                    TotalCount = group.Count()
                 })
-            .OrderByDescending(item => item.Value)
+            .OrderByDescending(loc => loc.TotalCount)
+            .Take(5) // Show top 5 locations
             .ToList();
 
-        chartData = litterTypeCounts;
+        locationChartData = locationGroups;
 
-        // Process frequency data - count by day of week
-        var dayFrequency = trashItems
-            .GroupBy(item => item.Timestamp.DayOfWeek)
-            .Select(group => new FrequencyDataItem
-                {
-                    Label = GetDayAbbreviation(group.Key),
-                    Value = group.Count()
-                })
-            .OrderBy(item => GetDayOrder(item.Label))
-            .ToList();
+        // Process frequency data - count by hour of day
+        var hourlyFrequency = new List<FrequencyDataItem>();
 
-        // Add summary statistics
-        var totalItems = trashItems.Count;
-        var avgPerDay = totalItems / 7;
-        var maxDay = dayFrequency.MaxBy(d => d.Value)?.Value ?? 0;
-        var minDay = dayFrequency.MinBy(d => d.Value)?.Value ?? 0;
-
-        dayFrequency.AddRange(new[]
+        // Create hourly buckets from 06:00 to 22:00
+        for (int hour = 6; hour <= 22; hour++)
         {
-            new FrequencyDataItem { Label = "Gem", Value = avgPerDay },
-            new FrequencyDataItem { Label = "Max", Value = maxDay },
-            new FrequencyDataItem { Label = "Min", Value = minDay },
-            new FrequencyDataItem { Label = "Totaal", Value = Math.Min(totalItems, 100) }, // Scale for display
-        });
+            var count = trashItems.Count(item => item.Timestamp.Hour == hour);
+            hourlyFrequency.Add(new FrequencyDataItem
+                {
+                    Label = $"{hour:D2}:00",
+                    Time = $"{hour:D2}:00",
+                    Value = count
+                });
+        }
 
-        frequencyData = dayFrequency;
+        frequencyData = hourlyFrequency;
+    }
+
+    private string GetLocationName(float latitude, float longitude)
+    {
+        // Convert lat/lng to approximate location names
+        // This is a simplified approach - in a real app you'd use reverse geocoding
+
+        // Amsterdam area (52.3676° N, 4.9041° E)
+        if (latitude >= 52.3 && latitude <= 52.4 && longitude >= 4.8 && longitude <= 5.0)
+            return "Grote Markt";
+
+        // Rotterdam area (51.9244° N, 4.4777° E)
+        if (latitude >= 51.8 && latitude <= 52.0 && longitude >= 4.3 && longitude <= 4.6)
+            return "Centraal Station";
+
+        // Utrecht area (52.0907° N, 5.1214° E)
+        if (latitude >= 52.0 && latitude <= 52.2 && longitude >= 5.0 && longitude <= 5.2)
+            return "Vondelpark";
+
+        // The Hague area (52.0705° N, 4.3007° E)
+        if (latitude >= 52.0 && latitude <= 52.1 && longitude >= 4.2 && longitude <= 4.4)
+            return "Haagse Park";
+
+        // Default locations for other coordinates
+        var random = new Random((int)(latitude * 1000 + longitude * 1000));
+        var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
+        return locations[random.Next(locations.Length)];
     }
 
     private string GetDayAbbreviation(DayOfWeek day)
@@ -146,10 +178,8 @@
         isLoading = true;
         StateHasChanged();
 
-        // Filter the data based on selected criteria
         var filteredItems = trashItems.AsEnumerable();
 
-        // Apply period filter
         if (!string.IsNullOrEmpty(selectedPeriod))
         {
             var now = DateTime.Now;
@@ -162,14 +192,14 @@
             };
         }
 
-        // Apply category filter
         if (!string.IsNullOrEmpty(selectedCategory))
         {
             var categoryMap = new Dictionary<string, string>
             {
                 { "plastic", "Plastic" },
                 { "papier", "Papier" },
-                { "gft", "Organisch" }
+                { "gft", "Organisch" },
+                { "glas", "Glas" }
             };
 
             if (categoryMap.TryGetValue(selectedCategory, out var actualCategory))
@@ -179,18 +209,93 @@
             }
         }
 
-        // Update the working dataset
+        if (!string.IsNullOrEmpty(selectedLocation))
+        {
+            filteredItems = filteredItems.Where(item =>
+                GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase));
+        }
+
         var originalItems = trashItems;
         trashItems = filteredItems.ToList();
 
         await ProcessData();
-
-        // Restore original data for future filtering
         trashItems = originalItems;
 
-        await Task.Delay(500); // Simulate processing time
+        await Task.Delay(500);
         isLoading = false;
         StateHasChanged();
+    }
+
+    private int GetMaxValueForLocation(LocationChartData location)
+    {
+        return location.TypeCounts.Values.DefaultIfEmpty(0).Max();
+    }
+
+    private List<string> GetAllWasteTypes()
+    {
+        return locationChartData
+            .SelectMany(loc => loc.TypeCounts.Keys)
+            .Distinct()
+            .OrderBy(type => type)
+            .ToList();
+    }
+
+    private string GenerateFrequencyPath()
+    {
+        if (!frequencyData.Any()) return "";
+
+        var maxValue = frequencyData.Max(f => f.Value);
+        if (maxValue == 0) maxValue = 1;
+
+        var chartWidth = 800;
+        var chartHeight = 300;
+        var padding = 40;
+
+        var pathParts = new List<string>();
+
+        for (int i = 0; i < frequencyData.Count; i++)
+        {
+            var x = padding + (i * (chartWidth - 2 * padding) / (frequencyData.Count - 1));
+            var y = chartHeight - padding - ((frequencyData[i].Value * (chartHeight - 2 * padding)) / maxValue);
+
+            if (i == 0)
+                pathParts.Add($"M {x} {y}");
+            else
+                pathParts.Add($"L {x} {y}");
+        }
+
+        return string.Join(" ", pathParts);
+    }
+
+    private string GenerateFrequencyArea()
+    {
+        if (!frequencyData.Any()) return "";
+
+        var maxValue = frequencyData.Max(f => f.Value);
+        if (maxValue == 0) maxValue = 1;
+
+        var chartWidth = 800;
+        var chartHeight = 300;
+        var padding = 40;
+
+        var pathParts = new List<string>();
+
+        // Start from bottom left
+        pathParts.Add($"M {padding} {chartHeight - padding}");
+
+        // Draw the curve
+        for (int i = 0; i < frequencyData.Count; i++)
+        {
+            var x = padding + (i * (chartWidth - 2 * padding) / (frequencyData.Count - 1));
+            var y = chartHeight - padding - ((frequencyData[i].Value * (chartHeight - 2 * padding)) / maxValue);
+            pathParts.Add($"L {x} {y}");
+        }
+
+        // Close the area to bottom right
+        pathParts.Add($"L {chartWidth - padding} {chartHeight - padding}");
+        pathParts.Add("Z");
+
+        return string.Join(" ", pathParts);
     }
 }
 
@@ -234,9 +339,10 @@
                         <label for="locatie" class="form-label">Locatie</label>
                         <select class="form-select" id="locatie" @bind="selectedLocation">
                             <option value="">Kies locatie</option>
-                            <option value="amsterdam">Amsterdam</option>
-                            <option value="rotterdam">Rotterdam</option>
-                            <option value="utrecht">Utrecht</option>
+                            @foreach (var location in locationChartData.Select(l => l.LocationName).Distinct())
+                            {
+                                <option value="@location">@location</option>
+                            }
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -281,12 +387,12 @@
                 <ul class="nav nav-tabs chart-tabs mb-3" id="chartTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="typeverdeling-tab" data-bs-toggle="tab" data-bs-target="#typeverdeling" type="button" role="tab">
-                            Typeverdeling
+                            Afval Typeverdeling per Locatie
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="frequentie-tab" data-bs-toggle="tab" data-bs-target="#frequentie" type="button" role="tab">
-                            Frequentie
+                            Frequentie Analyse
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -299,21 +405,53 @@
                 <!-- Tab Content -->
                 <div class="tab-content" id="chartTabContent">
                     <div class="tab-pane fade show active" id="typeverdeling" role="tabpanel">
-                        <h6 class="mb-3">Typeverdeling afval</h6>
-                        @if (chartData.Any())
+                        <h6 class="mb-3">Afval Typeverdeling per Locatie</h6>
+                        <p class="text-muted small mb-3">Analyse van verschillende afvaltypes per locatie</p>
+
+                        @if (locationChartData.Any())
                         {
-                            <div class="chart-container px-3 py-3">
-                                @foreach (var item in chartData)
-                                {
-                                    var percentage = trashItems.Count > 0 ? (item.Value * 100 / trashItems.Count) : 0;
-                                    <div class="d-flex flex-column align-items-center">
-                                        <small class="chart-label mb-2">@item.Label</small>
-                                        <div class="chart-bar"
-                                             style="height: @(item.Value * 4)px;"
-                                             data-bs-toggle="tooltip"
-                                             data-bs-placement="top"
-                                             title="@item.Label: @item.Value items (@percentage.ToString("F1")%)">
+                            <!-- Legend -->
+                            <div class="mb-3">
+                                <div class="d-flex flex-wrap gap-3">
+                                    @foreach (var wasteType in GetAllWasteTypes())
+                                    {
+                                        <div class="d-flex align-items-center">
+                                            <div class="legend-color me-2" style="background-color: @wasteTypeColors.GetValueOrDefault(wasteType, "#95a5a6")"></div>
+                                            <small>@wasteType</small>
                                         </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Location Chart -->
+                            <div class="location-chart-container">
+                                @{
+                                    // Calculate max value across all locations and waste types for scaling
+                                    var maxValue = locationChartData
+                                    .SelectMany(loc => loc.TypeCounts.Values)
+                                    .DefaultIfEmpty(1)
+                                    .Max();
+                                    var maxHeight = 200; // Maximum bar height in pixels
+                                }
+                                @foreach (var location in locationChartData)
+                                {
+                                    <div class="location-group">
+                                        <div class="location-bars">
+                                            @foreach (var wasteType in GetAllWasteTypes())
+                                            {
+                                                var count = location.TypeCounts.GetValueOrDefault(wasteType, 0);
+                                                // Scale height proportionally to max value
+                                                var height = count > 0 ? Math.Max((count * maxHeight / maxValue), 4) : 0;
+                                                var color = wasteTypeColors.GetValueOrDefault(wasteType, "#95a5a6");
+
+                                                <div class="chart-bar-location"
+                                                     style="height: @(height)px; background-color: @color;"
+                                                     data-bs-toggle="tooltip"
+                                                     title="@wasteType: @count items">
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="location-label">@location.LocationName</div>
                                     </div>
                                 }
                             </div>
@@ -321,27 +459,88 @@
                         else
                         {
                             <div class="alert alert-warning">
-                                Geen data beschikbaar voor typeverdeling.
+                                Geen data beschikbaar voor locatie-analyse.
                             </div>
                         }
                     </div>
 
                     <div class="tab-pane fade" id="frequentie" role="tabpanel">
-                        <h6 class="mb-3">Frequentieanalyse</h6>
+                        <div class="frequency-chart-header mb-4">
+                            <h6 class="mb-1">Frequentie Analyse</h6>
+                            <p class="text-muted small mb-0">Afvaldetecties per tijdstip van de dag</p>
+                        </div>
+
                         @if (frequencyData.Any())
                         {
-                            <div class="chart-container px-3 py-3">
-                                @foreach (var item in frequencyData)
-                                {
-                                    <div class="d-flex flex-column align-items-center">
-                                        <div class="chart-bar"
-                                             style="height: @(Math.Max(item.Value * 2, 10))px;"
-                                             data-bs-toggle="tooltip"
-                                             title="@item.Label: @item.Value">
-                                        </div>
-                                        <small class="chart-label mt-2">@item.Label</small>
-                                    </div>
-                                }
+                            <div class="frequency-chart-container">
+                                <svg class="frequency-svg" viewBox="0 0 800 350">
+                                    <!-- Grid lines -->
+                                    <defs>
+                                        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                                            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#e5e5e5" stroke-width="1" opacity="0.3" />
+                                        </pattern>
+                                    </defs>
+                                    <rect width="100%" height="100%" fill="url(#grid)" />
+
+                                    <!-- Y-axis labels -->
+                                    @{
+                                        var maxFreqValue = frequencyData.Max(f => f.Value);
+                                        var ySteps = 4;
+                                        var chartHeight = 300;
+                                        var padding = 40;
+                                    }
+                                    @for (int i = 0; i <= ySteps; i++)
+                                    {
+                                        var yValue = (maxFreqValue * i) / ySteps;
+                                        var yPos = chartHeight - padding - (i * (chartHeight - 2 * padding) / ySteps);
+                                        <svg:text x="30" y="@(yPos + 4)" font-size="12" fill="#666" text-anchor="end">@yValue</svg:text>
+                                        <line x1="35" y1="@yPos" x2="760" y2="@yPos" stroke="#e5e5e5" stroke-width="1" opacity="0.5"></line>
+                                    }
+
+                                    <!-- X-axis labels -->
+                                    @for (int i = 0; i < frequencyData.Count; i += 2)
+                                    {
+                                        var xPos = padding + (i * (800 - 2 * padding) / (frequencyData.Count - 1));
+                                        <svg:text x="@xPos" y="@(chartHeight - 15)" font-size="12" fill="#666" text-anchor="middle">@frequencyData[i].Time</svg:text>
+                                    }
+
+                                    <!-- Area fill -->
+                                    <path d="@GenerateFrequencyArea()"
+                                          fill="url(#blueGradient)"
+                                          opacity="0.3"></path>
+
+                                    <!-- Line -->
+                                    <path d="@GenerateFrequencyPath()"
+                                          fill="none"
+                                          stroke="#4299e1"
+                                          stroke-width="3"
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"></path>
+
+                                    <!-- Data points -->
+                                    @for (int i = 0; i < frequencyData.Count; i++)
+                                    {
+                                        var xPos = padding + (i * (800 - 2 * padding) / (frequencyData.Count - 1));
+                                        var yPos = chartHeight - padding - ((frequencyData[i].Value * (chartHeight - 2 * padding)) / maxFreqValue);
+                                        <circle cx="@xPos"
+                                                cy="@yPos"
+                                                r="4"
+                                                fill="#4299e1"
+                                                stroke="white"
+                                                stroke-width="2"
+                                                class="frequency-point"
+                                                data-bs-toggle="tooltip"
+                                                title="@frequencyData[i].Time: @frequencyData[i].Value detecties"></circle>
+                                    }
+
+                                    <!-- Gradient definition -->
+                                    <defs>
+                                        <linearGradient id="blueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#4299e1;stop-opacity:0.8"></stop>
+                                            <stop offset="100%" style="stop-color:#4299e1;stop-opacity:0.1"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
                             </div>
                         }
                         else
@@ -363,18 +562,21 @@
             </div>
         </div>
 
-        <!-- Dynamic Insights based on real data -->
+        <!-- Dynamic Insights based on location data -->
         <h5 class="mb-3">Data Inzichten</h5>
 
-        @if (chartData.Any())
+        @if (locationChartData.Any())
         {
-            var mostCommonType = chartData.First();
+            var topLocation = locationChartData.First();
+            var topWasteType = topLocation.TypeCounts.OrderByDescending(kvp => kvp.Value).First();
+
             <div class="card mb-3">
                 <div class="card-body">
                     <span class="badge insight-badge mb-2">Inzicht</span>
-                    <h6 class="card-title">Meest voorkomend afvaltype</h6>
+                    <h6 class="card-title">Meest vervuilde locatie</h6>
                     <p class="card-text text-muted">
-                        @mostCommonType.Label is het meest voorkomende afvaltype met @mostCommonType.Value items (@((mostCommonType.Value * 100 / trashItems.Count).ToString("F1"))% van het totaal).
+                        @topLocation.LocationName heeft de meeste afvalmeldingen (@topLocation.TotalCount items),
+                        vooral @topWasteType.Key (@topWasteType.Value items).
                     </p>
                 </div>
             </div>
@@ -396,8 +598,129 @@
     }
 </main>
 
+<style>
+    .location-chart-container {
+        display: flex;
+        justify-content: space-around;
+        align-items: flex-end;
+        min-height: 350px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        gap: 15px;
+        overflow-x: auto;
+    }
+
+    .location-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 120px;
+    }
+
+    .location-bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        margin-bottom: 10px;
+        height: 220px; /* Fixed container height */
+    }
+
+    .chart-bar-location {
+        width: 20px;
+        min-width: 20px;
+        transition: all 0.3s ease;
+        border-radius: 3px 3px 0 0;
+        cursor: pointer;
+    }
+
+        .chart-bar-location:hover {
+            opacity: 0.8;
+            transform: translateY(-2px);
+        }
+
+    .location-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-align: center;
+        font-weight: 500;
+        max-width: 100px;
+        word-wrap: break-word;
+        line-height: 1.2;
+    }
+
+    .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        flex-shrink: 0;
+    }
+
+    .insight-badge {
+        background-color: #e3f2fd;
+        color: #1976d2;
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    /* Frequency Chart Styles */
+    .frequency-chart-container {
+        background-color: #f8f9fb;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 20px 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .frequency-chart-header h6 {
+        color: #2d3748;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+
+    .frequency-svg {
+        width: 100%;
+        height: auto;
+        max-height: 350px;
+    }
+
+    .frequency-point {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .frequency-point:hover {
+            r: 6;
+            fill: #3182ce;
+        }
+
+    @@media (max-width: 768px) {
+        .location-chart-container {
+            padding: 10px;
+            gap: 10px;
+        }
+
+        .location-group {
+            min-width: 80px;
+        }
+
+        .chart-bar-location {
+            width: 15px;
+            min-width: 15px;
+        }
+
+        .location-label {
+            font-size: 0.75rem;
+            max-width: 80px;
+        }
+
+        .frequency-chart-container {
+            padding: 15px;
+        }
+    }
+</style>
+
 <script>
-    // Initialize Bootstrap tooltips
     document.addEventListener('DOMContentLoaded', function() {
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
