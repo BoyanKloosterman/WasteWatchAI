@@ -11,6 +11,8 @@ namespace WasteWatchAIBackend.Data
         public DbSet<WeatherData> WeatherData { get; set; }
         public DbSet<PredictionResult> PredictionResults { get; set; }
         public DbSet<TrashItem> TrashItems { get; set; }
-        
+
+        public DbSet<DummyTrashItem> DummyTrashItems { get; set; }
+
     }
 }
