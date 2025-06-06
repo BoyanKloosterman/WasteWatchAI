@@ -89,7 +89,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                                                                 .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                                                                 .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
@@ -118,30 +118,32 @@
 
     private string GetLocationName(float latitude, float longitude)
     {
-        // Convert lat/lng to approximate location names
-        // This is a simplified approach - in a real app you'd use reverse geocoding
+        // Breda: Chasséveld
+        if (latitude >= 51.5890 && latitude <= 51.5902 && longitude >= 4.7750 && longitude <= 4.7766)
+            return "Chasséveld";
 
-        // Amsterdam area (52.3676° N, 4.9041° E)
-        if (latitude >= 52.3 && latitude <= 52.4 && longitude >= 4.8 && longitude <= 5.0)
-            return "Grote Markt";
+        // Breda: Centraal Station
+        if (latitude >= 51.5953 && latitude <= 51.5963 && longitude >= 4.7787 && longitude <= 4.7797)
+            return "Centraal Station Breda";
 
-        // Rotterdam area (51.9244° N, 4.4777° E)
-        if (latitude >= 51.8 && latitude <= 52.0 && longitude >= 4.3 && longitude <= 4.6)
-            return "Centraal Station";
+        // Breda: Valkenberg Park
+        if (latitude >= 51.5929 && latitude <= 51.5939 && longitude >= 4.7791 && longitude <= 4.7801)
+            return "Valkenberg Park";
 
-        // Utrecht area (52.0907° N, 5.1214° E)
-        if (latitude >= 52.0 && latitude <= 52.2 && longitude >= 5.0 && longitude <= 5.2)
-            return "Vondelpark";
+        // Breda: Grote Markt
+        if (latitude >= 51.5858 && latitude <= 51.5868 && longitude >= 4.7751 && longitude <= 4.7761)
+            return "Grote Markt Breda";
 
-        // The Hague area (52.0705° N, 4.3007° E)
-        if (latitude >= 52.0 && latitude <= 52.1 && longitude >= 4.2 && longitude <= 4.4)
-            return "Haagse Park";
+        // Breda: Haagdijk
+        if (latitude >= 51.5910 && latitude <= 51.5920 && longitude >= 4.7785 && longitude <= 4.7795)
+            return "Haagdijk";
 
         // Default locations for other coordinates
         var random = new Random((int)(latitude * 1000 + longitude * 1000));
         var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
         return locations[random.Next(locations.Length)];
     }
+
 
     private string GetDayAbbreviation(DayOfWeek day)
     {
