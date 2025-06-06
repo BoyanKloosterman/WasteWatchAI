@@ -215,7 +215,9 @@
         cursor: pointer;
         /* Add outline for accessibility on focus */
         outline: none;
+        transform: translateX(15px); /* Move all rects 4px to the right */
     }
+
 
         .typeverdling-svg rect:hover,
         .typeverdling-svg rect:focus {
@@ -230,6 +232,7 @@
     font-weight: 500;
     fill: #444;
     font-size: 13px;
+    transform: translateX(8px)
 }
 
 .typeverdling-wastetype-label {
