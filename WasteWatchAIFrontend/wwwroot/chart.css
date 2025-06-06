@@ -200,8 +200,10 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
     margin-bottom: 0.5rem;
     width: 100%;
-    min-width: 1200px; /* was 700px */
-    max-width: 2000px; /* was 1200px */
+    min-width: 0; /* Remove min-width restriction */
+    max-width: 100%; /* Fill parent */
+    height: auto;
+    display: block;
 }
 
     .typeverdling-svg text {
