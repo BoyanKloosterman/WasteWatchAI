@@ -1,4 +1,6 @@
-﻿namespace WasteWatchAIFrontend.Models
+﻿using System.Text.Json.Serialization;
+
+namespace WasteWatchAIFrontend.Models
 {
 
     public class CorrelationScatter
