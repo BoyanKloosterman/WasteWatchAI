@@ -98,17 +98,19 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadTrashData();
+        await LoadDummyTrashData();
         await ProcessData();
         await LoadCorrelationData();
     }
 
-    private async Task LoadTrashData()
+    private async Task LoadDummyTrashData()
     {
         try
         {
             var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
-            var response = await httpClient.GetAsync("api/dummytrashitems");
+            // Haalt dummydata op via de nieuwe endpoint: api/trashitems/dummy
+            var response = await httpClient.GetAsync("api/trashitems/dummy");
+
             if (response.IsSuccessStatusCode)
             {
                 trashItems = await response.Content.ReadFromJsonAsync<List<DummyTrashItem>>() ?? new();
@@ -213,7 +215,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                                                                                                                                                                                                                                                                                 .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                                                                                                                                                                                                                                                                                                     .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
@@ -553,32 +555,6 @@
             isLoadingCorrelation = false;
             StateHasChanged();
         }
-    }
-
-    private async Task<List<DummyTrashItem>> LoadRealTrashItems()
-    {
-        try
-        {
-            var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
-            var response = await httpClient.GetAsync("api/trashitems"); // Real data endpoint
-            if (response.IsSuccessStatusCode)
-            {
-                var realItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
-                return realItems.Select(item => new DummyTrashItem
-                    {
-                        Id = item.Id,
-                        LitterType = item.LitterType,
-                        Latitude = item.Latitude,
-                        Longitude = item.Longitude,
-                        Timestamp = item.Timestamp
-                    }).ToList();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading real trash data: {ex.Message}");
-        }
-        return new List<DummyTrashItem>();
     }
 
     private async Task InitializeCorrelationChart()

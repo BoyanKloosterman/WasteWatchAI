@@ -8,16 +8,22 @@ namespace WasteWatchAIBackend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class DummyTrashItemsController : ControllerBase
+    public class TrashItemsController : ControllerBase
     {
         private readonly WasteWatchDbContext _context;
 
-        public DummyTrashItemsController(WasteWatchDbContext context)
+        public TrashItemsController(WasteWatchDbContext context)
         {
             _context = context;
         }
 
-        [HttpGet]
+        [HttpGet("trash")]
+        public async Task<ActionResult<IEnumerable<TrashItem>>> GetTrashItems()
+        {
+            return await _context.TrashItems.ToListAsync();
+        }
+
+        [HttpGet("dummy")]
         public async Task<ActionResult<IEnumerable<DummyTrashItem>>> GetDummyTrashItems()
         {
             return await _context.DummyTrashItems.ToListAsync();
