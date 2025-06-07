@@ -211,7 +211,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                                                             .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                                                     .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
@@ -388,7 +388,6 @@
     }
 }
 
-// Main Content
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="pt-3">
