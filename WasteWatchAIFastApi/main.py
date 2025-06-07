@@ -512,7 +512,7 @@ async def analyze_correlation(request: CorrelationRequest):
         chart_data = {
             "temperature_data": {
                 "labels": [d.strftime("%d-%m") for d in merged_df['date']],
-                "temperature": merged_df['avg_temp'].tolist(),
+                "temperature": [round(temp, 2) for temp in merged_df['avg_temp'].tolist()],
                 "trash_count": merged_df['trash_count'].astype(int).tolist()
             },
             "weather_distribution": {
@@ -520,7 +520,7 @@ async def analyze_correlation(request: CorrelationRequest):
                 "values": merged_df['weather_category'].value_counts().values.tolist()
             },
             "correlation_scatter": {
-                "temperature": merged_df['avg_temp'].tolist(),
+                "temperature": [round(temp, 2) for temp in merged_df['avg_temp'].tolist()],
                 "trash_count": merged_df['trash_count'].astype(int).tolist()
             }
         }
