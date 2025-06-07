@@ -4,6 +4,7 @@
 @using System.ComponentModel.DataAnnotations
 @using WasteWatchAIFrontend.Models
 @using System.Text.Json.Serialization;
+@using System.Text.Json;
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
 @code {
@@ -212,7 +213,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                                                                                                                                                                                         .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                                                                                                                                                                                                                         .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
@@ -442,6 +443,16 @@
 
         try
         {
+            // Activate the correlations tab first
+            await JS.InvokeVoidAsync("eval", @"
+            // Activate correlations tab
+            var correlationTab = document.querySelector('button[data-bs-target=""#correlaties""]');
+            if (correlationTab) {
+                var tab = new bootstrap.Tab(correlationTab);
+                tab.show();
+            }
+        ");
+
             Console.WriteLine("Starting correlation data load...");
             var httpClient = HttpClientFactory.CreateClient();
 
@@ -474,24 +485,68 @@
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"API Response content: {responseContent.Substring(0, Math.Min(200, responseContent.Length))}...");
+                Console.WriteLine($"API Response received - Length: {responseContent.Length} characters");
 
-                correlationData = await response.Content.ReadFromJsonAsync<CorrelationData>();
-                Console.WriteLine($"Parsed correlation data - Coefficient: {correlationData?.CorrelationCoefficient}, Sunny: {correlationData?.SunnyWeatherPercentage}%");
+                var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                    };
 
-                await InitializeCorrelationChart();
+                correlationData = JsonSerializer.Deserialize<CorrelationData>(responseContent, options);
+
+                if (correlationData != null)
+                {
+                    Console.WriteLine($"Successfully parsed correlation data:");
+                    Console.WriteLine($"  - Coefficient: {correlationData.CorrelationCoefficient}");
+                    Console.WriteLine($"  - Strength: {correlationData.CorrelationStrength}");
+                    Console.WriteLine($"  - Sunny: {correlationData.SunnyWeatherPercentage}%");
+                    Console.WriteLine($"  - Rainy: {correlationData.RainyWeatherPercentage}%");
+                    Console.WriteLine($"  - Temperature data points: {correlationData.ChartData.TemperatureData.Temperature.Count}");
+                    Console.WriteLine($"  - Weather distribution labels: {correlationData.ChartData.WeatherDistribution.Labels.Count}");
+                    Console.WriteLine($"  - Correlation scatter points: {correlationData.ChartData.CorrelationScatter.Temperature.Count}");
+                    Console.WriteLine($"  - Insights count: {correlationData.Insights.Count}");
+
+                    // Force state change to render HTML
+                    StateHasChanged();
+
+                    // Wait longer for DOM to update and start chart initialization in background
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(1000); // Wait 1 second for DOM to be ready
+                        await InvokeAsync(async () =>
+                        {
+                            await InitializeCorrelationChart();
+                        });
+                    });
+                }
+                else
+                {
+                    correlationError = "Failed to parse correlation data from API response";
+                    Console.WriteLine(correlationError);
+                }
             }
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                correlationError = $"Error loading correlation data: {response.StatusCode} - {errorContent}";
-                Console.WriteLine(correlationError);
+                correlationError = $"API Error: {response.StatusCode} - {errorContent}";
+                Console.WriteLine($"API Error - Status: {response.StatusCode}, Content: {errorContent}");
             }
+        }
+        catch (HttpRequestException httpEx)
+        {
+            correlationError = $"Network error: {httpEx.Message}. Make sure the FastAPI server is running on http://localhost:8000";
+            Console.WriteLine($"HTTP Exception in LoadCorrelationData: {httpEx}");
+        }
+        catch (JsonException jsonEx)
+        {
+            correlationError = $"JSON parsing error: {jsonEx.Message}";
+            Console.WriteLine($"JSON Exception in LoadCorrelationData: {jsonEx}");
         }
         catch (Exception ex)
         {
-            correlationError = $"Error: {ex.Message}";
-            Console.WriteLine($"Exception in LoadCorrelationData: {ex}");
+            correlationError = $"Unexpected error: {ex.Message}";
+            Console.WriteLine($"General Exception in LoadCorrelationData: {ex}");
         }
         finally
         {
@@ -534,6 +589,47 @@
             return;
         }
 
+        Console.WriteLine("Starting chart initialization...");
+
+        // Wait for DOM elements to exist with retry mechanism
+        var maxRetries = 10;
+        var retryCount = 0;
+        bool elementsExist = false;
+
+        while (!elementsExist && retryCount < maxRetries)
+        {
+            await Task.Delay(200); // Wait 200ms between checks
+
+            try
+            {
+                var correlationExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('correlationChart') !== null");
+                var weatherExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('weatherDistributionChart') !== null");
+                var scatterExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('scatterChart') !== null");
+
+                Console.WriteLine($"Retry {retryCount + 1}: Canvas elements exist - Correlation: {correlationExists}, Weather: {weatherExists}, Scatter: {scatterExists}");
+
+                if (correlationExists && weatherExists && scatterExists)
+                {
+                    elementsExist = true;
+                    break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking canvas elements on retry {retryCount + 1}: {ex.Message}");
+            }
+
+            retryCount++;
+        }
+
+        if (!elementsExist)
+        {
+            Console.WriteLine("Canvas elements not found after maximum retries. Charts will not be initialized.");
+            return;
+        }
+
+        Console.WriteLine("Canvas elements found, initializing charts...");
+
         try
         {
             // Initialize main correlation chart
@@ -564,9 +660,9 @@
             };
 
             await JS.InvokeVoidAsync("initializeCorrelationChart", chartData);
-            Console.WriteLine("Main correlation chart initialized");
+            Console.WriteLine("Main correlation chart initialized successfully");
 
-            // Initialize weather distribution chart if data is available
+            // Initialize weather distribution chart
             if (correlationData.ChartData.WeatherDistribution?.Labels?.Any() == true)
             {
                 var weatherChartData = new
@@ -576,7 +672,7 @@
                 };
 
                 await JS.InvokeVoidAsync("initializeWeatherDistributionChart", weatherChartData);
-                Console.WriteLine("Weather distribution chart initialized");
+                Console.WriteLine("Weather distribution chart initialized successfully");
             }
 
             // Initialize scatter plot
@@ -600,10 +696,10 @@
                 };
 
                 await JS.InvokeVoidAsync("initializeScatterChart", scatterData);
-                Console.WriteLine("Scatter chart initialized");
+                Console.WriteLine("Scatter chart initialized successfully");
             }
 
-            Console.WriteLine("All charts initialization completed");
+            Console.WriteLine("All charts initialization completed successfully");
         }
         catch (Exception ex)
         {
@@ -834,26 +930,10 @@
                                                 <i class="fas fa-sun"></i>
                                             </div>
                                             <h3 class="correlation-value text-warning">
-                                                @if (correlationData.SunnyWeatherPercentage > 0)
-                                                {
-                                                    <text>+@correlationData.SunnyWeatherPercentage.ToString("0")%</text>
-                                                }
-                                                else
-                                                {
-                                                    <text>@correlationData.SunnyWeatherPercentage.ToString("0")%</text>
-                                                }
+                                                @correlationData.SunnyWeatherPercentage.ToString("0.0")%
                                             </h3>
                                             <p class="correlation-label">Zonnig Weer</p>
-                                            <small class="text-muted">
-                                                @if (correlationData.SunnyWeatherPercentage > correlationData.RainyWeatherPercentage)
-                                                {
-                                                    <text>Meer afval bij zonnig weer</text>
-                                                }
-                                                else
-                                                {
-                                                    <text>Minder afval bij zonnig weer</text>
-                                                }
-                                            </small>
+                                            <small class="text-muted">Percentage zonnige dagen</small>
                                         </div>
                                     </div>
                                 </div>
@@ -864,125 +944,101 @@
                                                 <i class="fas fa-cloud-rain"></i>
                                             </div>
                                             <h3 class="correlation-value text-info">
-                                                @if (correlationData.RainyWeatherPercentage > correlationData.SunnyWeatherPercentage)
-                                                {
-                                                    <text>+@correlationData.RainyWeatherPercentage.ToString("0")%</text>
-                                                }
-                                                else
-                                                {
-                                                    <text>-@correlationData.RainyWeatherPercentage.ToString("0")%</text>
-                                                }
+                                                @correlationData.RainyWeatherPercentage.ToString("0.0")%
                                             </h3>
                                             <p class="correlation-label">Regenachtig Weer</p>
-                                            <small class="text-muted">
-                                                @if (correlationData.RainyWeatherPercentage > correlationData.SunnyWeatherPercentage)
-                                                {
-                                                    <text>Meer afval bij regen</text>
-                                                }
-                                                else
-                                                {
-                                                    <text>Minder afval bij regen</text>
-                                                }
-                                            </small>
+                                            <small class="text-muted">Percentage regenachtige dagen</small>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            // ...existing code until correlation chart section...
-
-                            <!-- Correlation Chart -->
-                            <div class="chart-container mb-4" style="position: relative; height: 400px; width: 100%;">
-                                <canvas id="correlationChart"></canvas>
+                            <!-- Main Correlation Chart -->
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-chart-line me-2"></i>Temperatuur vs Afval Correlatie
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container" style="position: relative; height: 400px; width: 100%;">
+                                        <canvas id="correlationChart"></canvas>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Additional Charts Row -->
-                            @if (correlationData.ChartData?.WeatherDistribution?.Labels?.Any() == true ||
-                           correlationData.ChartData?.CorrelationScatter?.Temperature?.Any() == true)
-                            {
-                                <div class="row mb-4">
-                                    <!-- Weather Distribution Chart -->
-                                    @if (correlationData.ChartData?.WeatherDistribution?.Labels?.Any() == true)
-                                    {
-                                        <div class="col-md-6">
-                                            <div class="card">
-                                                <div class="card-header">
-                                                    <h6 class="mb-0">
-                                                        <i class="fas fa-cloud me-2"></i>Weer Verdeling
-                                                    </h6>
-                                                </div>
-                                                <div class="card-body">
-                                                    <div class="chart-container" style="height: 300px;">
-                                                        <canvas id="weatherDistributionChart"></canvas>
-                                                    </div>
-                                                </div>
+                            <div class="row mb-4">
+                                <!-- Weather Distribution Chart -->
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-cloud me-2"></i>Weer Verdeling
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+                                                <canvas id="weatherDistributionChart"></canvas>
                                             </div>
                                         </div>
-                                    }
-
-                                    <!-- Scatter Plot -->
-                                    @if (correlationData.ChartData?.CorrelationScatter?.Temperature?.Any() == true)
-                                    {
-                                        <div class="col-md-6">
-                                            <div class="card">
-                                                <div class="card-header">
-                                                    <h6 class="mb-0">
-                                                        <i class="fas fa-chart-scatter me-2"></i>Correlatie Scatter Plot
-                                                    </h6>
-                                                </div>
-                                                <div class="card-body">
-                                                    <div class="chart-container" style="height: 300px;">
-                                                        <canvas id="scatterChart"></canvas>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    }
+                                    </div>
                                 </div>
-                            }
+
+                                <!-- Scatter Plot -->
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-chart-scatter me-2"></i>Correlatie Scatter Plot
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+                                                <canvas id="scatterChart"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- Temperature Statistics -->
                             @if (correlationData.ChartData.TemperatureData.Temperature.Any())
                             {
-                                <div class="row mb-4">
-                                    <div class="col-md-12">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="mb-0">
-                                                    <i class="fas fa-thermometer-half me-2"></i>Temperatuur Statistieken
-                                                </h6>
-                                            </div>
-                                            <div class="card-body">
-                                                @{
-                                                    var avgTemp = correlationData.ChartData.TemperatureData.Temperature.Average();
-                                                    var maxTemp = correlationData.ChartData.TemperatureData.Temperature.Max();
-                                                    var minTemp = correlationData.ChartData.TemperatureData.Temperature.Min();
-                                                }
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-thermometer-half me-2"></i>Temperatuur Statistieken
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        @{
+                                            var avgTemp = correlationData.ChartData.TemperatureData.Temperature.Average();
+                                            var maxTemp = correlationData.ChartData.TemperatureData.Temperature.Max();
+                                            var minTemp = correlationData.ChartData.TemperatureData.Temperature.Min();
+                                        }
 
-                                                <div class="row text-center">
-                                                    <div class="col-md-3">
-                                                        <h5 class="text-danger">@maxTemp.ToString("0.0")°C</h5>
-                                                        <small class="text-muted">Maximum</small>
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <h5 class="text-primary">@avgTemp.ToString("0.0")°C</h5>
-                                                        <small class="text-muted">Gemiddeld</small>
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <h5 class="text-info">@minTemp.ToString("0.0")°C</h5>
-                                                        <small class="text-muted">Minimum</small>
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <h5 class="text-success">@correlationData.ChartData.TemperatureData.TrashCount.Sum()</h5>
-                                                        <small class="text-muted">Totaal Afval Items</small>
-                                                    </div>
-                                                </div>
+                                        <div class="row text-center">
+                                            <div class="col-md-3">
+                                                <h5 class="text-danger">@maxTemp.ToString("0.0")°C</h5>
+                                                <small class="text-muted">Maximum</small>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <h5 class="text-primary">@avgTemp.ToString("0.0")°C</h5>
+                                                <small class="text-muted">Gemiddeld</small>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <h5 class="text-info">@minTemp.ToString("0.0")°C</h5>
+                                                <small class="text-muted">Minimum</small>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <h5 class="text-success">@correlationData.ChartData.TemperatureData.TrashCount.Sum()</h5>
+                                                <small class="text-muted">Totaal Afval Items</small>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             }
-
 
                             <!-- Insights -->
                             @if (correlationData.Insights.Any())
