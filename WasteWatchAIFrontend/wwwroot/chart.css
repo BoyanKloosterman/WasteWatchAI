@@ -146,6 +146,8 @@
     width: 100%;
     height: auto;
     max-height: 350px;
+    /* Optionally, you can add a min-width if you want to ensure it doesn't shrink too much on small screens: */
+    min-width: 900px; /* Add or adjust as needed for larger default width */
 }
 
 .frequency-point {

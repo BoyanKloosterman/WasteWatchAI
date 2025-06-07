@@ -6,6 +6,53 @@
 @inject IJSRuntime JS
 
 @code {
+    private string GetFilterSummary()
+    {
+        var parts = new List<string>();
+
+        // Periode
+        if (!string.IsNullOrEmpty(selectedPeriod))
+        {
+            parts.Add(selectedPeriod switch
+            {
+                "week" => "de afgelopen week",
+                "month" => "de afgelopen maand",
+                "year" => "het afgelopen jaar",
+                _ => ""
+            });
+        }
+        else
+        {
+            parts.Add("de volledige periode");
+        }
+
+        // Locatie
+        if (!string.IsNullOrEmpty(selectedLocation))
+            parts.Add($"locatie: {selectedLocation}");
+        else
+            parts.Add("alle locaties");
+
+        // Categorie
+        if (!string.IsNullOrEmpty(selectedCategory))
+        {
+            var cat = selectedCategory switch
+            {
+                "plastic" => "Plastic",
+                "papier" => "Papier",
+                "gft" => "GFT/Organisch",
+                "glas" => "Glas",
+                _ => selectedCategory
+            };
+            parts.Add($"categorie: {cat}");
+        }
+        else
+        {
+            parts.Add("alle categorieën");
+        }
+
+        return string.Join(", ", parts);
+    }
+
     // Models
     public class DummyTrashItem
     {
@@ -98,7 +145,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                                                .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                                                                                                                    .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
@@ -529,6 +576,9 @@
                     <div class="tab-pane fade show active" id="typeverdeling" role="tabpanel">
                         <h6 class="mb-3">Afval Typeverdeling per Locatie</h6>
                         <p class="text-muted small mb-3">Analyse van verschillende afvaltypes per locatie</p>
+                        <p class="text-muted small mb-2">
+                            Data voor: @GetFilterSummary()
+                        </p>
 
                         @if (locationChartData.Any())
                         {
@@ -562,6 +612,10 @@
                         <div class="frequency-chart-header mb-4">
                             <h6 class="mb-1">Frequentie Analyse</h6>
                             <p class="text-muted small mb-0">Afvaldetecties per tijdstip van de dag</p>
+                            <p class="text-muted small mb-2">
+                                Data voor: @GetFilterSummary()
+                            </p>
+
                         </div>
 
                         @if (frequencyData.Any())
