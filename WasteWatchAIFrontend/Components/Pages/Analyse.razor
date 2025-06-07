@@ -7,52 +7,6 @@
 @inject IJSRuntime JS
 
 @code {
-    private string GetFilterSummary()
-    {
-        var parts = new List<string>();
-
-        // Periode
-        if (!string.IsNullOrEmpty(selectedPeriod))
-        {
-            parts.Add(selectedPeriod switch
-            {
-                "week" => "de afgelopen week",
-                "month" => "de afgelopen maand",
-                "year" => "het afgelopen jaar",
-                _ => ""
-            });
-        }
-        else
-        {
-            parts.Add("de volledige periode");
-        }
-
-        // Locatie
-        if (!string.IsNullOrEmpty(selectedLocation))
-            parts.Add($"locatie: {selectedLocation}");
-        else
-            parts.Add("alle locaties");
-
-        // Categorie
-        if (!string.IsNullOrEmpty(selectedCategory))
-        {
-            var cat = selectedCategory switch
-            {
-                "plastic" => "Plastic",
-                "papier" => "Papier",
-                "gft" => "GFT/Organisch",
-                "glas" => "Glas",
-                _ => selectedCategory
-            };
-            parts.Add($"categorie: {cat}");
-        }
-        else
-        {
-            parts.Add("alle categorieën");
-        }
-
-        return string.Join(", ", parts);
-    }
 
     // State variables
     private List<DummyTrashItem> trashItems = new();
@@ -188,7 +142,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                                                                                                                             .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                                                                                                                     .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
@@ -275,6 +229,53 @@
             "Zo" => 7,
             _ => 8
         };
+    }
+
+    private string GetFilterSummary()
+    {
+        var parts = new List<string>();
+
+        // Periode
+        if (!string.IsNullOrEmpty(selectedPeriod))
+        {
+            parts.Add(selectedPeriod switch
+            {
+                "week" => "de afgelopen week",
+                "month" => "de afgelopen maand",
+                "year" => "het afgelopen jaar",
+                _ => ""
+            });
+        }
+        else
+        {
+            parts.Add("de volledige periode");
+        }
+
+        // Locatie
+        if (!string.IsNullOrEmpty(selectedLocation))
+            parts.Add($"locatie: {selectedLocation}");
+        else
+            parts.Add("alle locaties");
+
+        // Categorie
+        if (!string.IsNullOrEmpty(selectedCategory))
+        {
+            var cat = selectedCategory switch
+            {
+                "plastic" => "Plastic",
+                "papier" => "Papier",
+                "gft" => "GFT/Organisch",
+                "glas" => "Glas",
+                _ => selectedCategory
+            };
+            parts.Add($"categorie: {cat}");
+        }
+        else
+        {
+            parts.Add("alle categorieën");
+        }
+
+        return string.Join(", ", parts);
     }
 
     private async Task ApplyFilters()
