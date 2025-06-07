@@ -12,8 +12,8 @@ using WasteWatchAIBackend.Data;
 namespace WasteWatchAIBackend.Migrations
 {
     [DbContext(typeof(WasteWatchDbContext))]
-    [Migration("20250605134951_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20250606122247_initialcreate")]
+    partial class initialcreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
