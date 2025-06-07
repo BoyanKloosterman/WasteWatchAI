@@ -445,8 +445,18 @@ async def analyze_correlation(request: CorrelationRequest):
         sunny_percentage = (len(sunny_days) / total_days * 100) if total_days > 0 else 0
         rainy_percentage = (len(rainy_days) / total_days * 100) if total_days > 0 else 0
         
-        print(f"Sunny days: {len(sunny_days)} ({sunny_percentage:.1f}%), avg trash: {sunny_avg_trash:.1f}")
-        print(f"Rainy days: {len(rainy_days)} ({rainy_percentage:.1f}%), avg trash: {rainy_avg_trash:.1f}")
+        # Calculate percentages relative to overall average
+        overall_avg_trash = merged_df['trash_count'].mean()
+        
+        if overall_avg_trash > 0:
+            sunny_percentage_diff = ((sunny_avg_trash - overall_avg_trash) / overall_avg_trash * 100) if sunny_avg_trash > 0 else 0
+            rainy_percentage_diff = ((rainy_avg_trash - overall_avg_trash) / overall_avg_trash * 100) if rainy_avg_trash > 0 else 0
+        else:
+            sunny_percentage_diff = 0
+            rainy_percentage_diff = 0
+        
+        print(f"Sunny days: {len(sunny_days)} ({sunny_percentage:.1f}%), avg trash: {sunny_avg_trash:.1f} ({sunny_percentage_diff:+.0f}%)")
+        print(f"Rainy days: {len(rainy_days)} ({rainy_percentage:.1f}%), avg trash: {rainy_avg_trash:.1f} ({rainy_percentage_diff:+.0f}%)")
         
         # Determine correlation strength
         abs_temp_corr = abs(temp_correlation)
@@ -478,13 +488,21 @@ async def analyze_correlation(request: CorrelationRequest):
         else:
             insights.append(f"Geen significante correlatie tussen temperatuur en afvalvolume (r={temp_correlation:.3f})")
         
-        # Weather pattern insights
-        if rainy_avg_trash > 0 and sunny_avg_trash > rainy_avg_trash * 1.2:
-            insights.append(f"Zonnige dagen produceren {((sunny_avg_trash/rainy_avg_trash-1)*100):.0f}% meer afval dan regenachtige dagen")
-        elif sunny_avg_trash > 0 and rainy_avg_trash > sunny_avg_trash * 1.2:
-            insights.append(f"Regenachtige dagen tonen {((rainy_avg_trash/sunny_avg_trash-1)*100):.0f}% meer afval dan zonnige dagen")
-        else:
-            insights.append("Weertype heeft beperkte invloed op afvalvolume")
+        # Weather pattern insights with percentage differences
+        if abs(sunny_percentage_diff) > 10:
+            if sunny_percentage_diff > 0:
+                insights.append(f"Zonnig weer: {sunny_percentage_diff:+.0f}% meer afval dan gemiddeld")
+            else:
+                insights.append(f"Zonnig weer: {sunny_percentage_diff:.0f}% minder afval dan gemiddeld")
+        
+        if abs(rainy_percentage_diff) > 10:
+            if rainy_percentage_diff > 0:
+                insights.append(f"Regenachtig weer: {rainy_percentage_diff:+.0f}% meer afval dan gemiddeld")
+            else:
+                insights.append(f"Regenachtig weer: {rainy_percentage_diff:.0f}% minder afval dan gemiddeld")
+        
+        if abs(sunny_percentage_diff) <= 10 and abs(rainy_percentage_diff) <= 10:
+            insights.append("Weertype heeft beperkte invloed op afvalvolume (minder dan 10% verschil)")
         
         # Precipitation insights
         if precipitation_correlation < -0.3:
@@ -508,7 +526,7 @@ async def analyze_correlation(request: CorrelationRequest):
         
         print(f" FINAL DATA SOURCE: {'DUMMY/SIMULATED' if is_dummy_data else 'REAL WEATHER API'}")
         
-        # Prepare chart data
+        # Prepare chart data with weather categories
         chart_data = {
             "temperature_data": {
                 "labels": [d.strftime("%d-%m") for d in merged_df['date']],
@@ -521,15 +539,24 @@ async def analyze_correlation(request: CorrelationRequest):
             },
             "correlation_scatter": {
                 "temperature": [round(temp, 2) for temp in merged_df['avg_temp'].tolist()],
-                "trash_count": merged_df['trash_count'].astype(int).tolist()
+                "trash_count": merged_df['trash_count'].astype(int).tolist(),
+                "weather_category": merged_df['weather_category'].tolist(),
+                "weather_colors": [
+                    "#FFD700" if cat == "Zonnig" else
+                    "#87CEEB" if cat == "Gedeeltelijk bewolkt" else
+                    "#4682B4" if cat == "Regenachtig" else
+                    "#778899" if cat == "Bewolkt" else
+                    "#B0C4DE"
+                    for cat in merged_df['weather_category'].tolist()
+                ]
             }
         }
         
         result = CorrelationResponse(
             correlation_coefficient=float(temp_correlation),
             correlation_strength=correlation_strength,
-            sunny_weather_percentage=float(sunny_percentage),
-            rainy_weather_percentage=float(rainy_percentage),
+            sunny_weather_percentage=float(sunny_percentage_diff),
+            rainy_weather_percentage=float(rainy_percentage_diff),
             temperature_correlation=float(temp_correlation),
             insights=insights,
             chart_data=chart_data
