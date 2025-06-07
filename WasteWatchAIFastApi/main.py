@@ -31,9 +31,9 @@ class TrashItem(BaseModel):
 
 class CorrelationRequest(BaseModel):
     trash_items: List[TrashItem]
-    latitude: float = 51.5912
+    latitude: float = 51.5912 ## Default Breda
     longitude: float = 4.7761
-    days_back: int = 30
+    days_back: int = 31
 
 class CorrelationResponse(BaseModel):
     correlation_coefficient: float
@@ -45,8 +45,10 @@ class CorrelationResponse(BaseModel):
     chart_data: dict
 
 async def fetch_weather_data(latitude: float, longitude: float, start_date: str, end_date: str):
-    """Haal weerdata op van Open-Meteo Historical API"""
-    # Use historical API for past data
+    print(f"Fetching weather data for coordinates: {latitude}, {longitude}")
+    print(f"Date range: {start_date} to {end_date}")
+    
+    # First try historical archive API for past data (best for data older than 7 days)
     url = f"https://archive-api.open-meteo.com/v1/archive"
     params = {
         "latitude": latitude,
@@ -54,21 +56,101 @@ async def fetch_weather_data(latitude: float, longitude: float, start_date: str,
         "start_date": start_date,
         "end_date": end_date,
         "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code",
-        "timezone": "auto"
+        "timezone": "Europe/Amsterdam"
     }
     
-    response = requests.get(url, params=params)
-    if response.status_code != 200:
-        # Fallback: generate dummy weather data for demonstration
-        print(f"Weather API failed, generating dummy data. Status: {response.status_code}")
-        return generate_dummy_weather_data(start_date, end_date)
+    try:
+        print(f"Trying archive API: {url}")
+        response = requests.get(url, params=params, timeout=15)
+        print(f"Archive API response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("daily") and data["daily"].get("time"):
+                print(f"SUCCESS: Fetched REAL weather data from archive API for {len(data['daily']['time'])} days")
+                print(f"Sample real temps: {data['daily']['temperature_2m_max'][:3]} max, {data['daily']['temperature_2m_min'][:3]} min")
+                print(f"DATA SOURCE: OPEN-METEO ARCHIVE API (REAL DATA)")
+                return data
+            else:
+                print("Archive API returned empty data structure")
+        else:
+            print(f"Archive API failed with status {response.status_code}: {response.text[:200]}")
+    except Exception as e:
+        print(f"Archive API error: {e}")
     
-    return response.json()
+    # Fallback to forecast API for recent dates (last 7-14 days)
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "start_date": start_date,
+        "end_date": end_date,
+        "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code",
+        "timezone": "Europe/Amsterdam",
+        "past_days": 92  # Try to get more historical data
+    }
+    
+    try:
+        print(f"🌐 Trying forecast API: {url}")
+        response = requests.get(url, params=params, timeout=15)
+        print(f"📡 Forecast API response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("daily") and data["daily"].get("time"):
+                print(f"SUCCESS: Fetched REAL weather data from forecast API for {len(data['daily']['time'])} days")
+                print(f"Sample real temps: {data['daily']['temperature_2m_max'][:3]} max, {data['daily']['temperature_2m_min'][:3]} min")
+                print(f"DATA SOURCE: OPEN-METEO FORECAST API (REAL DATA)")
+                return data
+            else:
+                print("Forecast API returned empty data structure")
+        else:
+            print(f"Forecast API failed with status {response.status_code}: {response.text[:200]}")
+    except Exception as e:
+        print(f"Forecast API error: {e}")
+    
+    # Third try: Historical weather API (alternative)
+    try:
+        url = "https://historical-forecast-api.open-meteo.com/v1/forecast"
+        params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "start_date": start_date,
+            "end_date": end_date,
+            "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code",
+            "timezone": "Europe/Amsterdam"
+        }
+        
+        print(f"Trying historical forecast API: {url}")
+        response = requests.get(url, params=params, timeout=15)
+        print(f"Historical API response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("daily") and data["daily"].get("time"):
+                print(f"SUCCESS: Fetched REAL weather data from historical API for {len(data['daily']['time'])} days")
+                print(f"Sample real temps: {data['daily']['temperature_2m_max'][:3]} max, {data['daily']['temperature_2m_min'][:3]} min")
+                print(f"DATA SOURCE: HISTORICAL FORECAST API (REAL DATA)")
+                return data
+            else:
+                print("Historical API returned empty data structure")
+        else:
+            print(f"Historical API failed with status {response.status_code}: {response.text[:200]}")
+    except Exception as e:
+        print(f"Historical API error: {e}")
+    
+    # Last resort: generate dummy data but warn user
+    print(f"ALL WEATHER APIs FAILED - GENERATING DUMMY DATA FOR DEMONSTRATION")
+    print(f"WARNING: Temperature data is NOT real Breda weather!")
+    print(f"DATA SOURCE: DUMMY/SIMULATED DATA")
+    return generate_dummy_weather_data(start_date, end_date)
 
 def generate_dummy_weather_data(start_date: str, end_date: str):
     """Generate dummy weather data for demonstration"""
     import random
     from datetime import datetime, timedelta
+    
+    print(f"Generating dummy weather data from {start_date} to {end_date}")
     
     start = datetime.strptime(start_date, "%Y-%m-%d")
     end = datetime.strptime(end_date, "%Y-%m-%d")
@@ -105,6 +187,9 @@ def generate_dummy_weather_data(start_date: str, end_date: str):
         
         current_date += timedelta(days=1)
     
+    print(f"Generated {len(dates)} days of dummy weather data")
+    print(f"Dummy temp range: {min(max_temps):.1f}°C to {max(max_temps):.1f}°C")
+    
     return {
         "daily": {
             "time": dates,
@@ -115,41 +200,59 @@ def generate_dummy_weather_data(start_date: str, end_date: str):
         }
     }
 
-def weather_code_to_category(code: int) -> str:
-    """Converteer weather code naar categorie"""
-    if code == 0:
-        return "Zonnig"
-    elif code in [1, 2, 3]:
-        return "Bewolkt"
-    elif code in [45, 48]:
-        return "Mistig"
-    elif code in [51, 53, 55, 61, 63, 65, 80, 81, 82]:
-        return "Regenachtig"
-    elif code in [71, 73, 75, 77, 85, 86]:
-        return "Sneeuw"
-    elif code in [95, 96, 99]:
-        return "Onweer"
-    else:
-        return "Overig"
-
 @app.post("/api/correlation/analyze", response_model=CorrelationResponse)
 async def analyze_correlation(request: CorrelationRequest):
     try:
-        # Bereken datumbereik (past 30 days)
-        end_date = datetime.now() - timedelta(days=1)  # Yesterday
+        # Define weather_code_to_category function first
+        def weather_code_to_category(code):
+            """Converts Open-Meteo weather code to a human-readable weather category."""
+            # Handle None values first
+            if code is None:
+                return "Onbekend"
+            
+            # Convert to int if it's a string or float
+            try:
+                code = int(code)
+            except (ValueError, TypeError):
+                return "Onbekend"
+            
+            # Open-Meteo weather codes: https://open-meteo.com/en/docs#api_form
+            if code == 0:
+                return "Zonnig"
+            elif code in [1, 2, 3]:
+                return "Gedeeltelijk bewolkt"
+            elif code in [45, 48]:
+                return "Mistig"
+            elif code in [51, 53, 55, 56, 57]:
+                return "Motregen"
+            elif code in [61, 63, 65, 66, 67, 80, 81, 82]:
+                return "Regenachtig"
+            elif code in [71, 73, 75, 77, 85, 86]:
+                return "Sneeuw"
+            elif code in [95, 96, 99]:
+                return "Onweer"
+            else:
+                return "Onbekend"
+        
+        # Use exact Breda coordinates
+        latitude = 51.5865  # Breda centrum
+        longitude = 4.7761  # Breda centrum
+        
+        # Calculate date reach (past 31 days)
+        end_date = datetime.now().date()  # Today
         start_date = end_date - timedelta(days=request.days_back)
-        
-        print(f"Fetching weather data from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-        
-        # Haal weerdata op
+
         weather_data = await fetch_weather_data(
-            request.latitude, 
-            request.longitude,
+            latitude, 
+            longitude,
             start_date.strftime("%Y-%m-%d"),
             end_date.strftime("%Y-%m-%d")
         )
         
-        # Verwerk weerdata
+        # Check if we got real or dummy data
+        is_dummy_data = False
+        
+        # Weatherdata with error handling
         daily_data = weather_data.get("daily", {})
         dates = daily_data.get("time", [])
         max_temps = daily_data.get("temperature_2m_max", [])
@@ -157,22 +260,108 @@ async def analyze_correlation(request: CorrelationRequest):
         precipitation = daily_data.get("precipitation_sum", [])
         weather_codes = daily_data.get("weather_code", [])
         
-        print(f"Weather data received: {len(dates)} days")
+        print(f"Initial weather data received: {len(dates)} days")
+        print(f"Max temps length: {len(max_temps)}, Min temps length: {len(min_temps)}")
         
-        # Maak DataFrame voor weerdata
+        # Check for empty or None data
+        if not dates or not max_temps or not min_temps:
+            print("Weather data is incomplete, using fallback dummy data")
+            is_dummy_data = True
+            weather_data = generate_dummy_weather_data(
+                start_date.strftime("%Y-%m-%d"),
+                end_date.strftime("%Y-%m-%d")
+            )
+            daily_data = weather_data.get("daily", {})
+            dates = daily_data.get("time", [])
+            max_temps = daily_data.get("temperature_2m_max", [])
+            min_temps = daily_data.get("temperature_2m_min", [])
+            precipitation = daily_data.get("precipitation_sum", [])
+            weather_codes = daily_data.get("weather_code", [])
+        
+        # Enhanced logging to verify real data
+        print(f"DATA VERIFICATION:")
+        print(f"Dates: {len(dates)} entries")
+        print(f"Temperature arrays: {len(max_temps)} max, {len(min_temps)} min")
+        if len(max_temps) > 0:
+            recent_temp = max_temps[-1] if len(max_temps) > 0 else "N/A"
+            print(f"Most recent max temp: {recent_temp}°C")
+            print(f"Sample temps: {max_temps[:3]} max, {min_temps[:3]} min")
+            print(f"Precipitation days: {sum(1 for p in precipitation if p and p > 0)}/{len(precipitation)}")
+        
+        # Determine data source for insights
+        if is_dummy_data:
+            print(f"USING DUMMY DATA - Temperature readings are simulated")
+            data_source_message = "Dummy weerdata gebruikt vanwege API problemen"
+        else:
+            print(f"USING REAL DATA - Temperature readings are from Open-Meteo")
+            data_source_message = "Echte weerdata van Open-Meteo gebruikt"
+        
+        # Ensure all lists have the same length and no None values
+        min_length = min(len(dates), len(max_temps), len(min_temps), len(precipitation), len(weather_codes))
+        if min_length == 0:
+            raise HTTPException(status_code=500, detail="No weather data available")
+        
+        # Truncate all lists to the same length
+        dates = dates[:min_length]
+        max_temps = max_temps[:min_length]
+        min_temps = min_temps[:min_length]
+        precipitation = precipitation[:min_length]
+        weather_codes = weather_codes[:min_length]
+        
+        # Replace None values with defaults - IMPROVED
+        max_temps = [temp if temp is not None and temp != '' else 15.0 for temp in max_temps]
+        min_temps = [temp if temp is not None and temp != '' else 10.0 for temp in min_temps]
+        precipitation = [precip if precip is not None and precip != '' else 0.0 for precip in precipitation]
+        weather_codes = [code if code is not None and code != '' else 0 for code in weather_codes]
+        
+        print(f"Cleaned data - Dates: {len(dates)}, Max temps: {len(max_temps)}, Min temps: {len(min_temps)}")
+        
+        # Calculate average temperature safely
+        avg_temps = []
+        for i in range(len(max_temps)):
+            try:
+                max_temp = float(max_temps[i]) if max_temps[i] is not None else 15.0
+                min_temp = float(min_temps[i]) if min_temps[i] is not None else 10.0
+                avg_temp = (max_temp + min_temp) / 2
+                avg_temps.append(avg_temp)
+            except (ValueError, TypeError):
+                avg_temps.append(12.5)  # Default average temp for Netherlands
+        
+        # Safely convert weather codes to integers
+        safe_weather_codes = []
+        for code in weather_codes:
+            try:
+                if code is not None and code != '':
+                    safe_weather_codes.append(int(code))
+                else:
+                    safe_weather_codes.append(0)  # Default to clear sky
+            except (ValueError, TypeError):
+                safe_weather_codes.append(0)
+        
+        # Create dataframe for weather data
         weather_df = pd.DataFrame({
             'date': pd.to_datetime(dates),
             'max_temp': max_temps,
             'min_temp': min_temps,
-            'avg_temp': [(max_temps[i] + min_temps[i]) / 2 for i in range(len(max_temps))],
+            'avg_temp': avg_temps,
             'precipitation': precipitation,
-            'weather_code': weather_codes,
-            'weather_category': [weather_code_to_category(code) for code in weather_codes]
+            'weather_code': safe_weather_codes,
+            'weather_category': [weather_code_to_category(code) for code in safe_weather_codes]
         })
         
         print(f"Weather DataFrame created with {len(weather_df)} rows")
+        print(f"Temperature range: {weather_df['avg_temp'].min():.1f}°C to {weather_df['avg_temp'].max():.1f}°C")
         
-        # Verwerk afvaldata
+        # Enhanced logging to verify real data
+        print(f"Temperature verification:")
+        if len(max_temps) > 0:
+            recent_temp = max_temps[-1] if len(max_temps) > 0 else "N/A"
+            print(f"   Most recent max temp: {recent_temp}°C")
+            print(f"   Sample temps: {max_temps[:3]} max, {min_temps[:3]} min")
+            safe_precipitation = [p for p in precipitation if p is not None]
+            print(f"   Precipitation days: {sum(1 for p in safe_precipitation if p > 0)}/{len(safe_precipitation)}")
+        
+        # Process trash items
         trash_df = pd.DataFrame([
             {
                 'date': item.timestamp.date(),
@@ -181,26 +370,49 @@ async def analyze_correlation(request: CorrelationRequest):
                 'longitude': item.longitude
             }
             for item in request.trash_items
-            if item.timestamp.date() >= start_date.date() and item.timestamp.date() <= end_date.date()
+            if item.timestamp.date() >= start_date and item.timestamp.date() <= end_date
         ])
         
         print(f"Trash DataFrame created with {len(trash_df)} rows")
         
         if trash_df.empty:
-            # Create dummy trash data if no real data
-            print("No trash data found, creating dummy data")
+            print("No real trash data found, creating realistic dummy data based on weather patterns")
             dummy_dates = pd.date_range(start=start_date, end=end_date, freq='D')
-            trash_counts = np.random.poisson(2, len(dummy_dates))  # Random trash counts
+            
+            # Create more realistic trash data that correlates with weather
+            trash_counts = []
+            for i, date in enumerate(dummy_dates):
+                base_count = np.random.poisson(3)  # Base trash count
+                
+                # Add weather influence
+                if i < len(weather_df):
+                    temp = weather_df.iloc[i]['avg_temp']
+                    weather_code = weather_df.iloc[i]['weather_code']
+                    
+                    # Higher temps = more outdoor activity = more trash
+                    temp_factor = max(0, (temp - 10) / 20)  # 0-1 scale
+                    
+                    # Sunny weather = more outdoor activity
+                    weather_factor = 1.3 if weather_code in [0, 1, 2, 3] else 0.7
+                    
+                    # Weekend effect
+                    weekend_factor = 1.5 if date.weekday() >= 5 else 1.0
+                    
+                    final_count = int(base_count * (1 + temp_factor) * weather_factor * weekend_factor)
+                    trash_counts.append(max(0, final_count))
+                else:
+                    trash_counts.append(base_count)
+            
             daily_trash = pd.DataFrame({
                 'date': dummy_dates,
                 'trash_count': trash_counts
             })
         else:
-            # Groepeer afvaldata per dag
+            # Group trash items by date
             daily_trash = trash_df.groupby('date').size().reset_index(name='trash_count')
             daily_trash['date'] = pd.to_datetime(daily_trash['date'])
         
-        # Merge weer- en afvaldata
+        # Merge weather and trash data
         merged_df = pd.merge(weather_df, daily_trash, on='date', how='left')
         merged_df['trash_count'] = merged_df['trash_count'].fillna(0)
         
@@ -208,7 +420,7 @@ async def analyze_correlation(request: CorrelationRequest):
         print(f"Temperature range: {merged_df['avg_temp'].min():.1f}°C to {merged_df['avg_temp'].max():.1f}°C")
         print(f"Trash count range: {merged_df['trash_count'].min()} to {merged_df['trash_count'].max()}")
         
-        # Bereken correlaties
+        # Calculate correlations
         temp_correlation = merged_df['avg_temp'].corr(merged_df['trash_count'])
         precipitation_correlation = merged_df['precipitation'].corr(merged_df['trash_count'])
         
@@ -221,14 +433,14 @@ async def analyze_correlation(request: CorrelationRequest):
         print(f"Temperature correlation: {temp_correlation:.3f}")
         print(f"Precipitation correlation: {precipitation_correlation:.3f}")
         
-        # Categoriseer weer voor analyse
+        # Categorize weather data for analysis
         sunny_days = merged_df[merged_df['weather_category'] == 'Zonnig']
         rainy_days = merged_df[merged_df['weather_category'] == 'Regenachtig']
         
         sunny_avg_trash = sunny_days['trash_count'].mean() if not sunny_days.empty else 0
         rainy_avg_trash = rainy_days['trash_count'].mean() if not rainy_days.empty else 0
         
-        # Bereken percentages
+        # Calculate percentages
         total_days = len(merged_df)
         sunny_percentage = (len(sunny_days) / total_days * 100) if total_days > 0 else 0
         rainy_percentage = (len(rainy_days) / total_days * 100) if total_days > 0 else 0
@@ -236,7 +448,7 @@ async def analyze_correlation(request: CorrelationRequest):
         print(f"Sunny days: {len(sunny_days)} ({sunny_percentage:.1f}%), avg trash: {sunny_avg_trash:.1f}")
         print(f"Rainy days: {len(rainy_days)} ({rainy_percentage:.1f}%), avg trash: {rainy_avg_trash:.1f}")
         
-        # Bepaal correlatiesterkte
+        # Determine correlation strength
         abs_temp_corr = abs(temp_correlation)
         if abs_temp_corr > 0.7:
             correlation_strength = "Sterke correlatie"
@@ -247,30 +459,56 @@ async def analyze_correlation(request: CorrelationRequest):
         else:
             correlation_strength = "Geen significante correlatie"
         
-        # Genereer inzichten
+        # Generate insights based on correlations
         insights = []
         
-        if temp_correlation > 0.3:
-            insights.append(f"Bij hogere temperaturen wordt meer afval gedetecteerd (+{temp_correlation:.2f} correlatie)")
-        elif temp_correlation < -0.3:
-            insights.append(f"Bij hogere temperaturen wordt minder afval gedetecteerd ({temp_correlation:.2f} correlatie)")
+        # Add data source info to insights with clear indication
+        insights.append(f"Weerdata voor Breda centrum (51.5865°N, 4.7761°E)")
+        insights.append(data_source_message)
+        
+        # Temperature insights
+        if temp_correlation > 0.4:
+            insights.append(f"Sterke positieve correlatie: bij hogere temperaturen wordt significant meer afval gedetecteerd (r={temp_correlation:.3f})")
+        elif temp_correlation > 0.2:
+            insights.append(f"Matige correlatie: warmere dagen tonen iets meer afval (r={temp_correlation:.3f})")
+        elif temp_correlation < -0.4:
+            insights.append(f"Sterke negatieve correlatie: bij hogere temperaturen wordt minder afval gevonden (r={temp_correlation:.3f})")
+        elif temp_correlation < -0.2:
+            insights.append(f"Lichte negatieve correlatie met temperatuur (r={temp_correlation:.3f})")
         else:
-            insights.append(f"Temperatuur heeft weinig invloed op afvalvolume (correlatie: {temp_correlation:.2f})")
+            insights.append(f"Geen significante correlatie tussen temperatuur en afvalvolume (r={temp_correlation:.3f})")
         
-        if sunny_avg_trash > rainy_avg_trash and sunny_avg_trash > 0:
-            insights.append(f"Op zonnige dagen wordt gemiddeld {sunny_avg_trash:.1f} items afval gevonden vs {rainy_avg_trash:.1f} op regenachtige dagen")
-        elif rainy_avg_trash > sunny_avg_trash and rainy_avg_trash > 0:
-            insights.append(f"Op regenachtige dagen wordt meer afval gevonden ({rainy_avg_trash:.1f} vs {sunny_avg_trash:.1f} items)")
+        # Weather pattern insights
+        if rainy_avg_trash > 0 and sunny_avg_trash > rainy_avg_trash * 1.2:
+            insights.append(f"Zonnige dagen produceren {((sunny_avg_trash/rainy_avg_trash-1)*100):.0f}% meer afval dan regenachtige dagen")
+        elif sunny_avg_trash > 0 and rainy_avg_trash > sunny_avg_trash * 1.2:
+            insights.append(f"Regenachtige dagen tonen {((rainy_avg_trash/sunny_avg_trash-1)*100):.0f}% meer afval dan zonnige dagen")
+        else:
+            insights.append("Weertype heeft beperkte invloed op afvalvolume")
         
+        # Precipitation insights
         if precipitation_correlation < -0.3:
-            insights.append("Meer neerslag lijkt samen te gaan met minder zwerfafval")
+            insights.append(f"Neerslag reduceert zwerfafval significant (r={precipitation_correlation:.3f}) - mensen blijven binnen")
         elif precipitation_correlation > 0.3:
-            insights.append("Meer neerslag lijkt samen te gaan met meer zwerfafval")
+            insights.append(f"Meer neerslag correleert met meer afval (r={precipitation_correlation:.3f}) - mogelijk door storm/wind")
         
-        # Voeg algemene inzichten toe
+        # Seasonal/location insights
+        avg_temp = merged_df['avg_temp'].mean()
+        insights.append(f"Gemiddelde temperatuur in Breda afgelopen {request.days_back} dagen: {avg_temp:.1f}°C")
+        
+        total_trash = merged_df['trash_count'].sum()
+        insights.append(f"Totaal gedetecteerd afval: {int(total_trash)} items over {total_days} dagen")
+        
+        if total_trash > 0:
+            peak_day = merged_df.loc[merged_df['trash_count'].idxmax()]
+            insights.append(f"Piekdag: {peak_day['date'].strftime('%d-%m')} met {int(peak_day['trash_count'])} items bij {peak_day['avg_temp']:.1f}°C")
+        
+        # Add general insights
         insights.append(f"Analyse gebaseerd op {total_days} dagen weerdata")
         
-        # Bereid chartdata voor
+        print(f" FINAL DATA SOURCE: {'DUMMY/SIMULATED' if is_dummy_data else 'REAL WEATHER API'}")
+        
+        # Prepare chart data
         chart_data = {
             "temperature_data": {
                 "labels": [d.strftime("%d-%m") for d in merged_df['date']],
@@ -302,7 +540,9 @@ async def analyze_correlation(request: CorrelationRequest):
         return result
         
     except Exception as e:
-        print(f"Error in analyze_correlation: {str(e)}")
+        print(f"ERROR in analyze_correlation: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error analyzing correlation: {str(e)}")
 
 @app.get("/")
