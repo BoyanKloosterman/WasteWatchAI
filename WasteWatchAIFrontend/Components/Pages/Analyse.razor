@@ -121,17 +121,83 @@
             isLoading = false;
         }
     }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!isLoading)
         {
             await JS.InvokeVoidAsync("eval", @"
-                   var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle=""tooltip""]'));
-                   tooltipTriggerList.map(function (tooltipTriggerEl) {
-                       return new bootstrap.Tooltip(tooltipTriggerEl);
-                   });
-               ");
+                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle=""tooltip""]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            ");
+
+            // Initialize charts
+            await InitializeCharts();
         }
+    }
+
+    private async Task InitializeCharts()
+    {
+        // Initialize type distribution chart
+        await InitializeTypeDistributionChart();
+
+        // Initialize frequency chart
+        await InitializeFrequencyChart();
+    }
+
+    private async Task InitializeTypeDistributionChart()
+    {
+        if (!locationChartData.Any()) return;
+
+        var locations = locationChartData.Select(l => l.LocationName).ToArray();
+        var wasteTypes = GetAllWasteTypes();
+
+        var datasets = wasteTypes.Select(wasteType => new
+        {
+            label = wasteType,
+            data = locationChartData.Select(loc => loc.TypeCounts.GetValueOrDefault(wasteType, 0)).ToArray(),
+            backgroundColor = wasteTypeColors.GetValueOrDefault(wasteType, "#95a5a6"),
+            borderColor = wasteTypeColors.GetValueOrDefault(wasteType, "#95a5a6"),
+            borderWidth = 1
+        }).ToArray();
+
+        var chartData = new
+        {
+            labels = locations,
+            datasets = datasets
+        };
+
+        await JS.InvokeVoidAsync("initializeTypeDistributionChart", chartData);
+    }
+
+    private async Task InitializeFrequencyChart()
+    {
+        if (!frequencyData.Any()) return;
+
+        var chartData = new
+        {
+            labels = frequencyData.Select(f => f.Time).ToArray(),
+            datasets = new[]
+            {
+                new
+                {
+                    label = "Detecties",
+                    data = frequencyData.Select(f => f.Value).ToArray(),
+                    borderColor = "#4299e1",
+                    backgroundColor = "rgba(66, 153, 225, 0.3)",
+                    fill = true,
+                    tension = 0.4,
+                    pointBackgroundColor = "#4299e1",
+                    pointBorderColor = "#ffffff",
+                    pointBorderWidth = 2,
+                    pointRadius = 4
+                }
+            }
+        };
+
+        await JS.InvokeVoidAsync("initializeFrequencyChart", chartData);
     }
 
     private async Task ProcessData()
@@ -145,7 +211,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                                                                                                                                    .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                         .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
@@ -203,8 +269,6 @@
         var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
         return locations[random.Next(locations.Length)];
     }
-
-
 
     private string GetDayAbbreviation(DayOfWeek day)
     {
@@ -287,6 +351,9 @@
         await Task.Delay(500);
         isLoading = false;
         StateHasChanged();
+
+        // Reinitialize charts with new data
+        await InitializeCharts();
     }
 
     private int GetMaxValueForLocation(LocationChartData location)
@@ -301,170 +368,6 @@
             .Distinct()
             .OrderBy(type => type)
             .ToList();
-    }
-
-    private string GenerateFrequencyPath()
-    {
-        if (!frequencyData.Any()) return "";
-
-        var maxValue = frequencyData.Max(f => f.Value);
-        if (maxValue == 0) maxValue = 1;
-
-        var chartWidth = 800;
-        var chartHeight = 300;
-        var padding = 40;
-
-        var pathParts = new List<string>();
-
-        for (int i = 0; i < frequencyData.Count; i++)
-        {
-            var x = padding + (i * (chartWidth - 2 * padding) / (frequencyData.Count - 1));
-            var y = chartHeight - padding - ((frequencyData[i].Value * (chartHeight - 2 * padding)) / maxValue);
-
-            if (i == 0)
-                pathParts.Add($"M {x} {y}");
-            else
-                pathParts.Add($"L {x} {y}");
-        }
-
-        return string.Join(" ", pathParts);
-    }
-
-    private string GenerateFrequencyArea()
-    {
-        if (!frequencyData.Any()) return "";
-
-        var maxValue = frequencyData.Max(f => f.Value);
-        if (maxValue == 0) maxValue = 1;
-
-        var chartWidth = 800;
-        var chartHeight = 300;
-        var padding = 40;
-
-        var pathParts = new List<string>();
-
-        // Start from bottom left
-        pathParts.Add($"M {padding} {chartHeight - padding}");
-
-        // Draw the curve
-        for (int i = 0; i < frequencyData.Count; i++)
-        {
-            var x = padding + (i * (chartWidth - 2 * padding) / (frequencyData.Count - 1));
-            var y = chartHeight - padding - ((frequencyData[i].Value * (chartHeight - 2 * padding)) / maxValue);
-            pathParts.Add($"L {x} {y}");
-        }
-
-        // Close the area to bottom right
-        pathParts.Add($"L {chartWidth - padding} {chartHeight - padding}");
-        pathParts.Add("Z");
-
-        return string.Join(" ", pathParts);
-    }
-
-    // New: Generate SVG bar chart for typeverdling (waste type distribution per location)
-    private string GenerateTypeverdlingBars(LocationChartData location, int chartWidth = 400, int chartHeight = 220, int padding = 40)
-    {
-        var wasteTypes = GetAllWasteTypes();
-        var maxValue = location.TypeCounts.Values.DefaultIfEmpty(1).Max();
-        if (maxValue == 0) maxValue = 1;
-
-        var barWidth = (chartWidth - 2 * padding) / Math.Max(wasteTypes.Count, 1);
-        var bars = new List<string>();
-
-        for (int i = 0; i < wasteTypes.Count; i++)
-        {
-            var wasteType = wasteTypes[i];
-            var count = location.TypeCounts.GetValueOrDefault(wasteType, 0);
-            var height = (count * (chartHeight - 2 * padding)) / maxValue;
-            var x = padding + i * barWidth;
-            var y = chartHeight - padding - height;
-            var color = wasteTypeColors.GetValueOrDefault(wasteType, "#95a5a6");
-
-            bars.Add($@"<rect x=""{x}"" y=""{y}"" width=""{barWidth - 8}"" height=""{height}"" fill=""{color}"" rx=""4"" data-bs-toggle=""tooltip"" title=""{wasteType}: {count}"" />");
-        }
-
-        return string.Join("\n", bars);
-    }
-
-    // New: Generate a single SVG for typeverdeling (waste type distribution) for all locations
-    private MarkupString GenerateCombinedTypeverdlingSvg()
-    {
-        if (!locationChartData.Any())
-            return (MarkupString)string.Empty;
-
-        var wasteTypes = GetAllWasteTypes();
-        var groupCount = locationChartData.Count;
-        // Make bars and gaps wider for a wider chart
-        var barWidth = 28;      // was 18
-        var groupGap = 64;      // was 36
-        var barGap = 16;        // was 6
-        var paddingLeft = 80;   // was 60
-        var paddingRight = 60;  // was 30
-        var paddingTop = 30;
-        var paddingBottom = 50;
-        var chartHeight = 220;
-        // Calculate a wider chart width
-        var chartWidth = paddingLeft + paddingRight + groupCount * (wasteTypes.Count * (barWidth + barGap) - barGap + groupGap);
-
-        var maxValue = locationChartData
-            .SelectMany(loc => loc.TypeCounts.Values)
-            .DefaultIfEmpty(1)
-            .Max();
-        if (maxValue == 0) maxValue = 1;
-
-        var svg = new System.Text.StringBuilder();
-        svg.AppendLine($@"<svg viewBox=""0 0 {chartWidth} {chartHeight + paddingTop + paddingBottom}"" class=""typeverdling-svg"" width=""{chartWidth}"" height=""{chartHeight + paddingTop + paddingBottom}"">");
-
-        // Y-axis grid lines and labels (horizontal gridlines)
-        int ySteps = 4;
-        for (int i = 0; i <= ySteps; i++)
-        {
-            var yValue = (maxValue * i) / ySteps;
-            var yPos = paddingTop + chartHeight - (i * chartHeight / ySteps);
-            svg.AppendLine($@"<text x=""{paddingLeft - 8}"" y=""{yPos + 4}"" font-size=""11"" fill=""#666"" text-anchor=""end"">{yValue}</text>");
-            svg.AppendLine($@"<line x1=""{paddingLeft}"" y1=""{yPos}"" x2=""{chartWidth - paddingRight}"" y2=""{yPos}"" stroke=""#000000"" stroke-width=""1"" opacity=""0.5"" />");
-        }
-
-        // Vertical gridlines at each group (location) boundary
-        for (int locIdx = 0; locIdx <= groupCount; locIdx++)
-        {
-            var groupX = paddingLeft + locIdx * (wasteTypes.Count * (barWidth + barGap) - barGap + groupGap);
-            svg.AppendLine($@"<line x1=""{groupX}"" y1=""{paddingTop}"" x2=""{groupX}"" y2=""{paddingTop + chartHeight}"" stroke=""#000000"" stroke-width=""1"" opacity=""0.5"" />");
-        }
-
-        // Bars for each location group
-        for (int locIdx = 0; locIdx < groupCount; locIdx++)
-        {
-            var location = locationChartData[locIdx];
-            var groupX = paddingLeft + locIdx * (wasteTypes.Count * (barWidth + barGap) - barGap + groupGap);
-
-            for (int wtIdx = 0; wtIdx < wasteTypes.Count; wtIdx++)
-            {
-                var wasteType = wasteTypes[wtIdx];
-                var count = location.TypeCounts.GetValueOrDefault(wasteType, 0);
-                var height = (count * chartHeight) / maxValue;
-                var x = groupX + wtIdx * (barWidth + barGap);
-                var y = paddingTop + chartHeight - height;
-                var color = wasteTypeColors.GetValueOrDefault(wasteType, "#95a5a6");
-
-                // CHANGED: Tooltip now only shows "{WasteType}: {count}"
-                svg.AppendLine($@"<rect x=""{x}"" y=""{y}"" width=""{barWidth}"" height=""{height}"" fill=""{color}"" rx=""4"" data-bs-toggle=""tooltip"" title=""{wasteType}: {count}"" />");
-            }
-        }
-
-        // X-axis location labels (centered under each group)
-        for (int locIdx = 0; locIdx < groupCount; locIdx++)
-        {
-            var location = locationChartData[locIdx];
-            var groupX = paddingLeft + locIdx * (wasteTypes.Count * (barWidth + barGap) - barGap + groupGap);
-            var groupWidth = wasteTypes.Count * (barWidth + barGap) - barGap;
-            var labelX = groupX + groupWidth / 2;
-            var labelY = paddingTop + chartHeight + 24;
-            svg.AppendLine($@"<text x=""{labelX}"" y=""{labelY}"" font-size=""12"" fill=""#444"" text-anchor=""middle"" class=""typeverdling-location-label"">{location.LocationName}</text>");
-        }
-
-        svg.AppendLine("</svg>");
-        return (MarkupString)svg.ToString();
     }
 }
 
@@ -582,22 +485,9 @@
 
                         @if (locationChartData.Any())
                         {
-                            <!-- Legend -->
-                            <div class="mb-3">
-                                <div class="d-flex flex-wrap gap-3">
-                                    @foreach (var wasteType in GetAllWasteTypes())
-                                    {
-                                        <div class="d-flex align-items-center">
-                                            <div class="legend-color me-2" style="background-color: @wasteTypeColors.GetValueOrDefault(wasteType, "#95a5a6")"></div>
-                                            <small>@wasteType</small>
-                                        </div>
-                                    }
-                                </div>
-                            </div>
-
-                            <!-- Combined SVG Bar Chart for all locations -->
-                            <div class="typeverdling-svg-charts">
-                                @GenerateCombinedTypeverdlingSvg()
+                            <!-- Chart Container -->
+                            <div class="chart-container" style="position: relative; height: 400px; width: 100%;">
+                                <canvas id="typeDistributionChart"></canvas>
                             </div>
                         }
                         else
@@ -615,80 +505,13 @@
                             <p class="text-muted small mb-2">
                                 Data voor: @GetFilterSummary()
                             </p>
-
                         </div>
 
                         @if (frequencyData.Any())
                         {
-                            <div class="frequency-chart-container">
-                                <svg class="frequency-svg" viewBox="0 0 800 350">
-                                    <!-- Grid lines -->
-                                    <defs>
-                                        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                                            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#e5e5e5" stroke-width="1" opacity="0.3" />
-                                        </pattern>
-                                    </defs>
-                                    <rect width="100%" height="100%" fill="url(#grid)" />
-
-                                    <!-- Y-axis labels -->
-                                    @{
-                                        var maxFreqValue = frequencyData.Max(f => f.Value);
-                                        var ySteps = 4;
-                                        var chartHeight = 300;
-                                        var padding = 40;
-                                    }
-                                    @for (int i = 0; i <= ySteps; i++)
-                                    {
-                                        var yValue = (maxFreqValue * i) / ySteps;
-                                        var yPos = chartHeight - padding - (i * (chartHeight - 2 * padding) / ySteps);
-                                        <svg:text x="30" y="@(yPos + 4)" font-size="12" fill="#666" text-anchor="end">@yValue</svg:text>
-                                        <line x1="35" y1="@yPos" x2="760" y2="@yPos" stroke="#e5e5e5" stroke-width="1" opacity="0.5"></line>
-                                    }
-
-                                    <!-- X-axis labels -->
-                                    @for (int i = 0; i < frequencyData.Count; i += 2)
-                                    {
-                                        var xPos = padding + (i * (800 - 2 * padding) / (frequencyData.Count - 1));
-                                        <svg:text x="@xPos" y="@(chartHeight - 15)" font-size="12" fill="#666" text-anchor="middle">@frequencyData[i].Time</svg:text>
-                                    }
-
-                                    <!-- Area fill -->
-                                    <path d="@GenerateFrequencyArea()"
-                                          fill="url(#blueGradient)"
-                                          opacity="0.3"></path>
-
-                                    <!-- Line -->
-                                    <path d="@GenerateFrequencyPath()"
-                                          fill="none"
-                                          stroke="#4299e1"
-                                          stroke-width="3"
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"></path>
-
-                                    <!-- Data points -->
-                                    @for (int i = 0; i < frequencyData.Count; i++)
-                                    {
-                                        var xPos = padding + (i * (800 - 2 * padding) / (frequencyData.Count - 1));
-                                        var yPos = chartHeight - padding - ((frequencyData[i].Value * (chartHeight - 2 * padding)) / maxFreqValue);
-                                        <circle cx="@xPos"
-                                                cy="@yPos"
-                                                r="4"
-                                                fill="#4299e1"
-                                                stroke="white"
-                                                stroke-width="2"
-                                                class="frequency-point"
-                                                data-bs-toggle="tooltip"
-                                                title="@frequencyData[i].Time: @frequencyData[i].Value detecties"></circle>
-                                    }
-
-                                    <!-- Gradient definition -->
-                                    <defs>
-                                        <linearGradient id="blueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                                            <stop offset="0%" style="stop-color:#4299e1;stop-opacity:0.8"></stop>
-                                            <stop offset="100%" style="stop-color:#4299e1;stop-opacity:0.1"></stop>
-                                        </linearGradient>
-                                    </defs>
-                                </svg>
+                            <!-- Chart Container -->
+                            <div class="chart-container" style="position: relative; height: 400px; width: 100%;">
+                                <canvas id="frequencyChart"></canvas>
                             </div>
                         }
                         else
@@ -748,12 +571,119 @@
 
 <link href="css/chart.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 
 <script>
+    let typeDistributionChart = null;
+    let frequencyChart = null;
+
     document.addEventListener('DOMContentLoaded', function() {
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
     });
+
+    window.initializeTypeDistributionChart = function(chartData) {
+        const ctx = document.getElementById('typeDistributionChart');
+        if (!ctx) return;
+
+        // Destroy existing chart if it exists
+        if (typeDistributionChart) {
+            typeDistributionChart.destroy();
+        }
+
+        typeDistributionChart = new Chart(ctx, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: false
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            }
+        });
+    };
+
+    window.initializeFrequencyChart = function(chartData) {
+        const ctx = document.getElementById('frequencyChart');
+        if (!ctx) return;
+
+        // Destroy existing chart if it exists
+        if (frequencyChart) {
+            frequencyChart.destroy();
+        }
+
+        frequencyChart = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: false
+                    },
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Tijd van de dag'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Aantal detecties'
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            }
+        });
+    };
 </script>
