@@ -8,7 +8,7 @@ let scatterChart = null;
 // Initialize tooltips on page load
 document.addEventListener('DOMContentLoaded', function () {
     console.log('Chart.js loaded, Chart object available:', typeof Chart !== 'undefined');
-    
+
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
@@ -20,6 +20,16 @@ window.initializeTypeDistributionChart = function (chartData) {
     const ctx = document.getElementById('typeDistributionChart');
     if (!ctx) {
         console.error('typeDistributionChart canvas element not found');
+        return;
+    }
+
+    // Destroy chart if no data
+    if (!chartData || !chartData.labels || chartData.labels.length === 0) {
+        if (typeDistributionChart) {
+            typeDistributionChart.destroy();
+            typeDistributionChart = null;
+        }
+        ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
         return;
     }
 
@@ -51,11 +61,22 @@ window.initializeTypeDistributionChart = function (chartData) {
     }
 };
 
+
 // Frequency Chart
 window.initializeFrequencyChart = function (chartData) {
     const ctx = document.getElementById('frequencyChart');
     if (!ctx) {
         console.error('frequencyChart canvas element not found');
+        return;
+    }
+
+    // Destroy chart if no data
+    if (!chartData || !chartData.labels || chartData.labels.length === 0) {
+        if (frequencyChart) {
+            frequencyChart.destroy();
+            frequencyChart = null;
+        }
+        ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
         return;
     }
 
@@ -95,10 +116,11 @@ window.initializeFrequencyChart = function (chartData) {
     }
 };
 
+
 // Correlation Chart (Main chart with temperature and trash count)
 window.initializeCorrelationChart = function (chartData) {
     console.log('initializeCorrelationChart called with data:', chartData);
-    
+
     const ctx = document.getElementById('correlationChart');
     if (!ctx) {
         console.error('correlationChart canvas element not found');
@@ -131,10 +153,10 @@ window.initializeCorrelationChart = function (chartData) {
                         mode: 'index',
                         intersect: false,
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 let label = context.dataset.label || '';
                                 if (label) label += ': ';
-                                
+
                                 if (context.dataset.yAxisID === 'y') {
                                     label += context.parsed.y + '°C';
                                 } else {
@@ -170,7 +192,7 @@ window.initializeCorrelationChart = function (chartData) {
                 interaction: { intersect: false, mode: 'index' }
             }
         });
-        
+
         console.log('Correlation chart initialized successfully');
     } catch (error) {
         console.error('Error initializing correlation chart:', error);
@@ -180,7 +202,7 @@ window.initializeCorrelationChart = function (chartData) {
 // Weather Distribution Chart
 window.initializeWeatherDistributionChart = function (chartData) {
     console.log('initializeWeatherDistributionChart called with data:', chartData);
-    
+
     const ctx = document.getElementById('weatherDistributionChart');
     if (!ctx) {
         console.error('weatherDistributionChart canvas element not found');
@@ -221,7 +243,7 @@ window.initializeWeatherDistributionChart = function (chartData) {
                     legend: { display: true, position: 'bottom' },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
                                 const percentage = ((context.parsed / total) * 100).toFixed(1);
                                 return `${context.label}: ${context.parsed} dagen (${percentage}%)`;
@@ -231,7 +253,7 @@ window.initializeWeatherDistributionChart = function (chartData) {
                 }
             }
         });
-        
+
         console.log('Weather distribution chart initialized successfully');
     } catch (error) {
         console.error('Error initializing weather distribution chart:', error);
@@ -241,7 +263,7 @@ window.initializeWeatherDistributionChart = function (chartData) {
 // Scatter Chart
 window.initializeScatterChart = function (chartData) {
     console.log('initializeScatterChart called with data:', chartData);
-    
+
     const ctx = document.getElementById('scatterChart');
     if (!ctx) {
         console.error('scatterChart canvas element not found');
@@ -267,7 +289,7 @@ window.initializeScatterChart = function (chartData) {
                     legend: { display: true, position: 'top' },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 return `Temp: ${context.parsed.x}°C, Afval: ${context.parsed.y} items`;
                             }
                         }
@@ -287,7 +309,7 @@ window.initializeScatterChart = function (chartData) {
                 interaction: { intersect: false, mode: 'point' }
             }
         });
-        
+
         console.log('Scatter chart initialized successfully');
     } catch (error) {
         console.error('Error initializing scatter chart:', error);
@@ -295,7 +317,7 @@ window.initializeScatterChart = function (chartData) {
 };
 
 // Debug function to check if all functions are available
-window.checkChartFunctions = function() {
+window.checkChartFunctions = function () {
     console.log('Chart functions available:');
     console.log('- initializeTypeDistributionChart:', typeof window.initializeTypeDistributionChart);
     console.log('- initializeFrequencyChart:', typeof window.initializeFrequencyChart);
@@ -303,4 +325,35 @@ window.checkChartFunctions = function() {
     console.log('- initializeWeatherDistributionChart:', typeof window.initializeWeatherDistributionChart);
     console.log('- initializeScatterChart:', typeof window.initializeScatterChart);
     console.log('- Chart.js available:', typeof Chart !== 'undefined');
+};
+// Function to destroy all charts
+window.destroyAllCharts = function () {
+    console.log('Destroying all charts...');
+
+    if (typeDistributionChart) {
+        typeDistributionChart.destroy();
+        typeDistributionChart = null;
+    }
+
+    if (frequencyChart) {
+        frequencyChart.destroy();
+        frequencyChart = null;
+    }
+
+    if (correlationChart) {
+        correlationChart.destroy();
+        correlationChart = null;
+    }
+
+    if (weatherDistributionChart) {
+        weatherDistributionChart.destroy();
+        weatherDistributionChart = null;
+    }
+
+    if (scatterChart) {
+        scatterChart.destroy();
+        scatterChart = null;
+    }
+
+    console.log('All charts destroyed successfully');
 };
