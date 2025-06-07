@@ -10,7 +10,7 @@
 @code {
 
     // State variables
-    private List<DummyTrashItem> trashItems = new();
+    private List<TrashItem> trashItems = new();
     private List<LocationChartData> locationChartData = new();
     private List<FrequencyDataItem> frequencyData = new();
     private bool isLoading = true;
@@ -20,72 +20,6 @@
     private CorrelationData? correlationData;
     private bool isLoadingCorrelation = false;
     private string correlationError = string.Empty;
-
-    public class CorrelationData
-    {
-        [JsonPropertyName("correlation_coefficient")]
-        public double CorrelationCoefficient { get; set; }
-
-        [JsonPropertyName("correlation_strength")]
-        public string CorrelationStrength { get; set; } = string.Empty;
-
-        [JsonPropertyName("sunny_weather_percentage")]
-        public double SunnyWeatherPercentage { get; set; }
-
-        [JsonPropertyName("rainy_weather_percentage")]
-        public double RainyWeatherPercentage { get; set; }
-
-        [JsonPropertyName("temperature_correlation")]
-        public double TemperatureCorrelation { get; set; }
-
-        [JsonPropertyName("insights")]
-        public List<string> Insights { get; set; } = new();
-
-        [JsonPropertyName("chart_data")]
-        public ChartData ChartData { get; set; } = new();
-    }
-
-    public class ChartData
-    {
-        [JsonPropertyName("temperature_data")]
-        public TemperatureData TemperatureData { get; set; } = new();
-
-        [JsonPropertyName("weather_distribution")]
-        public WeatherDistribution WeatherDistribution { get; set; } = new();
-
-        [JsonPropertyName("correlation_scatter")]
-        public CorrelationScatter CorrelationScatter { get; set; } = new();
-    }
-
-    public class TemperatureData
-    {
-        [JsonPropertyName("labels")]
-        public List<string> Labels { get; set; } = new();
-
-        [JsonPropertyName("temperature")]
-        public List<double> Temperature { get; set; } = new();
-
-        [JsonPropertyName("trash_count")]
-        public List<int> TrashCount { get; set; } = new();
-    }
-
-    public class WeatherDistribution
-    {
-        [JsonPropertyName("labels")]
-        public List<string> Labels { get; set; } = new();
-
-        [JsonPropertyName("values")]
-        public List<int> Values { get; set; } = new();
-    }
-
-    public class CorrelationScatter
-    {
-        [JsonPropertyName("temperature")]
-        public List<double> Temperature { get; set; } = new();
-
-        [JsonPropertyName("trash_count")]
-        public List<int> TrashCount { get; set; } = new();
-    }
 
     // Define color mapping for waste types
     private readonly Dictionary<string, string> wasteTypeColors = new()
@@ -113,7 +47,7 @@
 
             if (response.IsSuccessStatusCode)
             {
-                trashItems = await response.Content.ReadFromJsonAsync<List<DummyTrashItem>>() ?? new();
+                trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
             }
         }
         catch (Exception ex)
@@ -215,7 +149,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                                                                                                                                                                                                                                                                                                                     .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                                                                                                                                                                                                                                                                                                         .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
