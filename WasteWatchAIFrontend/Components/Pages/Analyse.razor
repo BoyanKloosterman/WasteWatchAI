@@ -211,7 +211,7 @@
                 {
                     LocationName = group.Key,
                     TypeCounts = group.GroupBy(item => item.LitterType)
-                                         .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
+                                                             .ToDictionary(typeGroup => typeGroup.Key, typeGroup => typeGroup.Count()),
                     TotalCount = group.Count()
                 })
             .OrderByDescending(loc => loc.TotalCount)
@@ -302,9 +302,6 @@
 
     private async Task ApplyFilters()
     {
-        isLoading = true;
-        StateHasChanged();
-
         var filteredItems = trashItems.AsEnumerable();
 
         if (!string.IsNullOrEmpty(selectedPeriod))
@@ -322,12 +319,12 @@
         if (!string.IsNullOrEmpty(selectedCategory))
         {
             var categoryMap = new Dictionary<string, string>
-            {
-                { "plastic", "Plastic" },
-                { "papier", "Papier" },
-                { "gft", "Organisch" },
-                { "glas", "Glas" }
-            };
+        {
+            { "plastic", "Plastic" },
+            { "papier", "Papier" },
+            { "gft", "Organisch" },
+            { "glas", "Glas" }
+        };
 
             if (categoryMap.TryGetValue(selectedCategory, out var actualCategory))
             {
@@ -348,12 +345,32 @@
         await ProcessData();
         trashItems = originalItems;
 
-        await Task.Delay(500);
-        isLoading = false;
         StateHasChanged();
-
-        // Reinitialize charts with new data
         await InitializeCharts();
+    }
+
+    // New method for handling filter changes
+    private async Task OnFilterChanged()
+    {
+        await ApplyFilters();
+    }
+
+    // New method for resetting filters
+    private async Task ResetFilters()
+    {
+        selectedPeriod = string.Empty;
+        selectedLocation = string.Empty;
+        selectedCategory = string.Empty;
+
+        await ApplyFilters();
+    }
+
+    // Helper method to check if any filters are active
+    private bool HasActiveFilters()
+    {
+        return !string.IsNullOrEmpty(selectedPeriod) ||
+               !string.IsNullOrEmpty(selectedLocation) ||
+               !string.IsNullOrEmpty(selectedCategory);
     }
 
     private int GetMaxValueForLocation(LocationChartData location)
@@ -396,20 +413,29 @@
         <!-- Filters Section -->
         <div class="card mb-4">
             <div class="card-body">
-                <h5 class="card-title">Datafilters</h5>
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0">Datafilters</h5>
+                    @if (HasActiveFilters())
+                    {
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ResetFilters" title="Alle filters wissen">
+                            <i class="fas fa-times me-1"></i>
+                            Reset
+                        </button>
+                    }
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
                         <label for="periode" class="form-label">Periode</label>
-                        <select class="form-select" id="periode" @bind="selectedPeriod">
+                        <select class="form-select" id="periode" @bind="selectedPeriod" @bind:after="OnFilterChanged">
                             <option value="">Selecteer datumbereik</option>
                             <option value="week">Deze week</option>
                             <option value="month">Deze maand</option>
                             <option value="year">Dit jaar</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label for="locatie" class="form-label">Locatie</label>
-                        <select class="form-select" id="locatie" @bind="selectedLocation">
+                        <select class="form-select" id="locatie" @bind="selectedLocation" @bind:after="OnFilterChanged">
                             <option value="">Kies locatie</option>
                             @foreach (var location in locationChartData.Select(l => l.LocationName).Distinct())
                             {
@@ -417,9 +443,9 @@
                             }
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label for="afvalcategorie" class="form-label">Afvalcategorie</label>
-                        <select class="form-select" id="afvalcategorie" @bind="selectedCategory">
+                        <select class="form-select" id="afvalcategorie" @bind="selectedCategory" @bind:after="OnFilterChanged">
                             <option value="">Selecteer categorie</option>
                             <option value="plastic">Plastic</option>
                             <option value="papier">Papier</option>
@@ -427,20 +453,16 @@
                             <option value="glas">Glas</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <button type="button" class="btn btn-primary" @onclick="ApplyFilters" disabled="@isLoading">
-                            @if (isLoading)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                <text>Laden...</text>
-                            }
-                            else
-                            {
-                                <text>Toepassen</text>
-                            }
-                        </button>
-                    </div>
                 </div>
+                @if (HasActiveFilters())
+                {
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-filter me-1"></i>
+                            Actieve filters: @GetFilterSummary()
+                        </small>
+                    </div>
+                }
             </div>
         </div>
 
