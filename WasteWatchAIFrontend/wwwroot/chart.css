@@ -1,4 +1,18 @@
 ﻿/* Charts specific styling */
+/* ...existing code... */
+
+/* Typeverdling SVG Charts */
+.typeverdling-svg-charts {
+    display: flex;
+    flex-direction: row; /* Changed from column to row */
+    gap: 2rem;
+    overflow-x: auto; /* Allow horizontal scrolling if needed */
+    align-items: flex-start;
+    width: 100%;
+    padding-bottom: 8px;
+}
+
+/* ...rest of existing code... */
 .chart-container {
     display: flex;
     justify-content: space-around;
@@ -48,3 +62,235 @@
     .chart-container::-webkit-scrollbar-thumb:hover {
         background: #555;
     }
+
+.location-chart-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    min-height: 350px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    gap: 15px;
+    overflow-x: auto;
+}
+
+.location-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 120px;
+}
+
+.location-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    margin-bottom: 10px;
+    height: 220px; /* Fixed container height */
+}
+
+.chart-bar-location {
+    width: 20px;
+    min-width: 20px;
+    transition: all 0.3s ease;
+    border-radius: 3px 3px 0 0;
+    cursor: pointer;
+}
+
+    .chart-bar-location:hover {
+        opacity: 0.8;
+        transform: translateY(-2px);
+    }
+
+.location-label {
+    font-size: 0.85rem;
+    color: #6c757d;
+    text-align: center;
+    font-weight: 500;
+    max-width: 100px;
+    word-wrap: break-word;
+    line-height: 1.2;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.insight-badge {
+    background-color: #e3f2fd;
+    color: #1976d2;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Frequency Chart Styles */
+.frequency-chart-container {
+    background-color: #f8f9fb;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.frequency-chart-header h6 {
+    color: #2d3748;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.frequency-svg {
+    width: 100%;
+    height: auto;
+    max-height: 350px;
+    /* Optionally, you can add a min-width if you want to ensure it doesn't shrink too much on small screens: */
+    min-width: 900px; /* Add or adjust as needed for larger default width */
+}
+
+.frequency-point {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+    .frequency-point:hover {
+        r: 6;
+        fill: #3182ce;
+    }
+
+@media (max-width: 768px) {
+    .location-chart-container {
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .location-group {
+        min-width: 80px;
+    }
+
+    .chart-bar-location {
+        width: 15px;
+        min-width: 15px;
+    }
+
+    .location-label {
+        font-size: 0.75rem;
+        max-width: 80px;
+    }
+
+    .frequency-chart-container {
+        padding: 15px;
+    }
+}
+
+/* Typeverdling SVG Charts */
+.typeverdling-svg-charts {
+    display: flex;
+    flex-direction: row; /* Changed from column to row */
+    gap: 2rem;
+    overflow-x: auto; /* Allow horizontal scrolling if needed */
+    align-items: flex-start;
+    width: 100%;
+    padding-bottom: 8px;
+}
+
+.typeverdling-svg {
+    background: #fafbfc;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    margin-bottom: 0.5rem;
+    width: 100%;
+    min-width: 0; /* Remove min-width restriction */
+    max-width: 100%; /* Fill parent */
+    height: auto;
+    display: block;
+}
+
+    .typeverdling-svg text {
+        font-family: 'Segoe UI', Arial, sans-serif;
+    }
+
+    .typeverdling-svg rect {
+        transition: fill 0.2s, height 0.2s, stroke 0.2s, filter 0.2s;
+        cursor: pointer;
+        /* Add outline for accessibility on focus */
+        outline: none;
+        transform: translateX(15px); /* Move all rects 4px to the right */
+    }
+
+
+        .typeverdling-svg rect:hover,
+        .typeverdling-svg rect:focus {
+            opacity: 0.95;
+            filter: brightness(1.15) drop-shadow(0 0 6px #bbb);
+            stroke: #222;
+            stroke-width: 2;
+            z-index: 2;
+        }
+
+.typeverdling-location-label {
+    font-weight: 500;
+    fill: #444;
+    font-size: 13px;
+    transform: translateX(8px)
+}
+
+.typeverdling-wastetype-label {
+    font-size: 11px;
+    fill: #888;
+}
+
+@media (max-width: 900px) {
+    .typeverdling-svg {
+        min-width: 900px;
+        max-width: 100vw;
+    }
+}
+
+.correlation-stat-card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+    .correlation-stat-card:hover {
+        transform: translateY(-2px);
+    }
+
+.correlation-icon {
+    font-size: 2rem;
+    color: #007bff;
+}
+
+.correlation-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin: 0;
+}
+
+.correlation-label {
+    font-weight: 600;
+    color: #6c757d;
+    margin-bottom: 0;
+}
+
+.chart-tabs .nav-link {
+    border-bottom: 2px solid transparent;
+}
+
+    .chart-tabs .nav-link.active {
+        border-bottom-color: #007bff;
+    }
+
+.chart-container {
+    position: relative;
+    height: 400px;
+    width: 100%;
+}
+
+.insight-badge {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
