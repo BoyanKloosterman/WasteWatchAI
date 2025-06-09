@@ -27,7 +27,7 @@ jobs:
           
       - name: Run FastAPI tests
         working-directory: ./WasteWatchAIFastApi
-        run: pytest tests/
+        run: python -m pytest tests/
 
       # ---- .NET Core API ----
       - name: Setup .NET
