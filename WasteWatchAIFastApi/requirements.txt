@@ -6,3 +6,4 @@ scikit-learn
 requests
 python-multipart
 httpx
+pytest
