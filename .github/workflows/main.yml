@@ -9,50 +9,49 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
     steps:
-      
-name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       # ---- FASTAPI (Python) ----
-      
-name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'  # Fixed: Added quotes around version
-name: Install FastAPI dependencies
-working-directory: ./WasteWatchAIFastApi
-run: |
-  python -m pip install --upgrade pip
-  pip install -r requirements.txt
-name: Run FastAPI tests
-working-directory: ./WasteWatchAIFastApi
-run: pytest tests/
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'  # Fixed: Added quotes around version
+          
+      - name: Install FastAPI dependencies
+        working-directory: ./WasteWatchAIFastApi
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Run FastAPI tests
+        working-directory: ./WasteWatchAIFastApi
+        run: pytest tests/
 
       # ---- .NET Core API ----
-      
-name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'  # Added quotes for consistency
-name: Restore .NET dependencies
-working-directory: ./WasteWatchAIBackend
-run: dotnet restore
-
-name: Build .NET API
-working-directory: ./WasteWatchAIBackend
-run: dotnet build --configuration Release --no-restore
-
-name: Test .NET API
-working-directory: ./WasteWatchAIBackend
-run: dotnet test --configuration Release --no-build
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'  # Added quotes for consistency
+          
+      - name: Restore .NET dependencies
+        working-directory: ./WasteWatchAIBackend
+        run: dotnet restore
+        
+      - name: Build .NET API
+        working-directory: ./WasteWatchAIBackend
+        run: dotnet build --configuration Release --no-restore
+        
+      - name: Test .NET API
+        working-directory: ./WasteWatchAIBackend
+        run: dotnet test --configuration Release --no-build
 
       # ---- BLAZOR Frontend ----
-      
-name: Restore Blazor dependencies
-      working-directory: ./WasteWatchAIFrontend
-      run: dotnet restore
-name: Build Blazor
-working-directory: ./WasteWatchAIFrontend
-run: dotnet build --configuration Release --no-restore
+      - name: Restore Blazor dependencies
+        working-directory: ./WasteWatchAIFrontend
+        run: dotnet restore
+        
+      - name: Build Blazor
+        working-directory: ./WasteWatchAIFrontend
+        run: dotnet build --configuration Release --no-restore
