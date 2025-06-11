@@ -357,3 +357,84 @@ window.destroyAllCharts = function () {
 
     console.log('All charts destroyed successfully');
 };
+
+window.drawTrashChart = (data) => {
+    const ctx = document.getElementById('trashChart').getContext('2d');
+
+    const labels = Object.keys(data).map(weekNum => 'Week ' + weekNum);
+    const values = Object.values(data);
+
+    if (window.trashChartInstance) {
+        window.trashChartInstance.destroy();
+    }
+
+    window.trashChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Verandering Afval per week (%)',
+                data: values,
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function (value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+};
+
+window.drawTrashChartMonthly = (data) => {
+    if (window.trashChartMonthlyInstance) {
+        window.trashChartMonthlyInstance.destroy();
+    }
+
+    const ctx = document.getElementById("trashChartMonthly").getContext("2d");
+    const labels = Object.keys(data).map(k => {
+        const year = Math.floor(k / 100);
+        const month = k % 100;
+        return new Date(year, month - 1).toLocaleString('nl-NL', { month: 'long', year: 'numeric' });
+    });
+
+    const values = Object.values(data);
+
+    trashChartMonthlyInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '% verandering t.o.v. vorige maand',
+                data: values,
+                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    title: { display: true, text: 'Percentage' },
+                    ticks: {
+                        callback: value => `${value}%`
+                    }
+                }
+            }
+        }
+    });
+}
+
