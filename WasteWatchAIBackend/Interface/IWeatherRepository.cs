@@ -6,5 +6,6 @@ namespace WasteWatchAIBackend.Interface
     {
         Task SaveWeatherAsync(WeatherData data);
         Task<IEnumerable<WeatherData>> GetAllAsync();
+        Task<bool> WeatherExistsAsync(DateTime date, double latitude, double longitude);
     }
 }
