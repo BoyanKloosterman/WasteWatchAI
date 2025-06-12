@@ -4,6 +4,14 @@
 
 <PageTitle>Dashboard</PageTitle>
 
+@if (showAlert)
+{
+    <div class="alert alert-danger alert-dismissible fade show position-fixed top-0 end-0 m-3" style="z-index: 1000;" role="alert">
+        <strong>Waarschuwing!</strong> @alertMessage
+        <button type="button" class="btn-close" @onclick="() => showAlert = false"></button>
+    </div>
+}
+
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 fw-bold">
@@ -296,19 +304,53 @@
     }
 
     private System.Threading.Timer? refreshTimer;
+    private bool showAlert = false;
+    private string alertMessage = string.Empty;
+    private List<string> notifiedHighAlerts = new();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDummyTrashData();
+        CheckForHighPriorityAlerts();
 
+        // Start timer om elke minuut data te verversen
         refreshTimer = new System.Threading.Timer(async _ =>
         {
             await InvokeAsync(async () =>
             {
                 await LoadDummyTrashData();
+                CheckForHighPriorityAlerts();
                 StateHasChanged();
             });
         }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+    }
+
+    private void CheckForHighPriorityAlerts()
+    {
+        var highAlerts = LocationAlerts
+            .Where(a => a.Priority == "Hoog" && !notifiedHighAlerts.Contains(a.LocationName))
+            .ToList();
+
+        if (highAlerts.Any())
+        {
+            foreach (var alert in highAlerts)
+            {
+                notifiedHighAlerts.Add(alert.LocationName);
+            }
+
+            var locations = string.Join(", ", highAlerts.Select(a => a.LocationName));
+            alertMessage = $"Hoog risico op locatie(s): {locations}";
+            showAlert = true;
+
+            Task.Delay(60000).ContinueWith(_ =>
+            {
+                InvokeAsync(() =>
+                {
+                    showAlert = false;
+                    StateHasChanged();
+                });
+            });
+        }
     }
 
     public void Dispose()
