@@ -81,39 +81,41 @@
             <div class="row g-3 align-items-end">
                 <div class="col-sm-6 col-md-3">
                     <label class="form-label fw-bold">Afvaltype</label>
-                    <select class="form-select">
-                        <option selected>Selecteer type</option>
-                        <option>Plastic</option>
-                        <option>Papier</option>
-                        <option>Glas</option>
-                        <option>Restafval</option>
+                    <select class="form-select" @bind="selectedLitterType">
+                        <option value="">Selecteer type</option>
+                        <option value="Plastic">Plastic</option>
+                        <option value="Papier">Papier</option>
+                        <option value="Glas">Glas</option>
+                        <option value="Restafval">Restafval</option>
                     </select>
                 </div>
 
                 <div class="col-sm-6 col-md-3">
                     <label class="form-label fw-bold">Locatie</label>
-                    <select class="form-select">
-                        <option selected>Kies locatie</option>
-                        <option>Station Zuid</option>
-                        <option>Plein Noord</option>
-                        <option>Centrum</option>
-                        <option>Westpark</option>
+                    <select class="form-select" @bind="selectedLocation">
+                        <option value="">Kies locatie</option>
+                        <option value="Grote Markt Breda">Grote Markt Breda</option>
+                        <option value="Centraal Station Breda">Centraal Station Breda</option>
+                        <option value="Valkenberg Park">Valkenberg Park</option>
+                        <option value="Haagdijk">Haagdijk</option>
+                        <option value="Chassé Park">Chassé Park</option>
+                        <option value="Chasséveld">Chasséveld</option>
                     </select>
                 </div>
 
                 <div class="col-sm-6 col-md-3">
                     <label class="form-label fw-bold">Datum</label>
-                    <select class="form-select">
-                        <option selected>Selecteer datum</option>
-                        <option>Vandaag</option>
-                        <option>Deze week</option>
-                        <option>Deze maand</option>
-                        <option>Dit jaar</option>
+                    <select class="form-select" @bind="selectedDateRange">
+                        <option value="">Selecteer datum</option>
+                        <option value="Vandaag">Vandaag</option>
+                        <option value="Deze week">Deze week</option>
+                        <option value="Deze maand">Deze maand</option>
+                        <option value="Dit jaar">Dit jaar</option>
                     </select>
                 </div>
 
                 <div class="col-sm-6 col-md-3">
-                    <button class="btn w-100" style="background-color: #634AFF; color: white;">
+                    <button class="btn w-100" style="background-color: #634AFF; color: white;" @onclick="ApplyFilters">
                         Toepassen
                     </button>
                 </div>
@@ -276,6 +278,12 @@
 
     private List<TrashItem> trashItems = new();
     private List<TrashItem> trashItemsLast30Days = new();
+    private List<TrashItem> filteredTrashItems = new();
+
+    // Filter variabelen
+    private string selectedLitterType = "";
+    private string selectedLocation = "";
+    private string selectedDateRange = "";
 
     public class LocationAlert
     {
@@ -314,6 +322,56 @@
         }
     }
 
+    private void ApplyFilters()
+    {
+        filteredTrashItems = trashItems.AsQueryable().ToList();
+
+        // Filter op afvaltype
+        if (!string.IsNullOrEmpty(selectedLitterType))
+        {
+            filteredTrashItems = filteredTrashItems
+                .Where(item => item.LitterType.Equals(selectedLitterType, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        // Filter op locatie
+        if (!string.IsNullOrEmpty(selectedLocation))
+        {
+            filteredTrashItems = filteredTrashItems
+                .Where(item => GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        // Filter op datumbereik
+        if (!string.IsNullOrEmpty(selectedDateRange))
+        {
+            var now = DateTime.Now;
+            DateTime startDate = now;
+
+            switch (selectedDateRange)
+            {
+                case "Vandaag":
+                    startDate = now.Date;
+                    break;
+                case "Deze week":
+                    startDate = now.AddDays(-(int)now.DayOfWeek).Date;
+                    break;
+                case "Deze maand":
+                    startDate = new DateTime(now.Year, now.Month, 1);
+                    break;
+                case "Dit jaar":
+                    startDate = new DateTime(now.Year, 1, 1);
+                    break;
+            }
+
+            filteredTrashItems = filteredTrashItems
+                .Where(item => item.Timestamp >= startDate)
+                .ToList();
+        }
+
+        Console.WriteLine($"Totaal aantal gefilterde items: {filteredTrashItems.Count}");
+    }
+
     private List<LocationAlert> GetLocationAlerts()
     {
         if (!trashItems.Any())
@@ -322,10 +380,6 @@
         var now = DateTime.Now; 
         var oneHourAgo = now.AddHours(-1);
         var twentyFourHoursAgo = now.AddHours(-24);
-
-        Console.WriteLine($"Nu: {now:yyyy-MM-dd HH:mm:ss}");
-        Console.WriteLine($"1 uur geleden: {oneHourAgo:yyyy-MM-dd HH:mm:ss}");
-        Console.WriteLine($"24 uur geleden: {twentyFourHoursAgo:yyyy-MM-dd HH:mm:ss}");
 
         var locationGroups = trashItems
             .GroupBy(item => GetLocationName(item.Latitude, item.Longitude))
@@ -344,11 +398,6 @@
             var last24HourItems = locationItems.Where(item =>
                 item.Timestamp >= twentyFourHoursAgo &&
                 item.Timestamp <= now).ToList();
-
-            Console.WriteLine($"Locatie: {group.Key}");
-            Console.WriteLine($"  Laatste uur: {lastHourItems.Count} items");
-            Console.WriteLine($"  Laatste 24u: {last24HourItems.Count} items");
-            Console.WriteLine($"  Totaal: {locationItems.Count} items");
 
             var alert = new LocationAlert
                 {
