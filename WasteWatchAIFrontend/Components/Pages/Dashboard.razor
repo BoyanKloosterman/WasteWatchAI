@@ -368,9 +368,10 @@
             {
                 trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
 
-                var dertigDagenGeleden = DateTime.UtcNow.AddDays(-30);
+                var now = DateTime.UtcNow;
+                var dertigDagenGeleden = now.AddDays(-30);
                 trashItemsLast30Days = trashItems
-                    .Where(item => item.Timestamp >= dertigDagenGeleden)
+                    .Where(item => item.Timestamp >= dertigDagenGeleden && item.Timestamp <= now)
                     .ToList();
             }
         }
