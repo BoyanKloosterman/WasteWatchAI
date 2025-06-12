@@ -41,8 +41,8 @@ class PredictionRequest(BaseModel):
     datum: str  # Format: "YYYY-MM-DD"
     temperatuur: float
     weersverwachting: str
-    latitude: float = 51.5865  # Default voor Breda centrum
-    longitude: float = 4.7761  # Default voor Breda centrum
+    latitude: float = 51.5890  # Default voor Breda centrum
+    longitude: float = 4.7750  # Default voor Breda centrum
 
 class PredictionResponse(BaseModel):
     datum: str
