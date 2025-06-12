@@ -295,9 +295,25 @@
         public string Priority { get; set; } = "Laag";
     }
 
+    private System.Threading.Timer? refreshTimer;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadDummyTrashData();
+
+        refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadDummyTrashData();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
     }
 
     private async Task LoadDummyTrashData()
