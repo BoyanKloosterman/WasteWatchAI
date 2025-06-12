@@ -48,8 +48,19 @@
         <div class="col-sm-6 col-lg-3 mb-3">
             <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
                 <div class="card-body">
-                    <h5 class="card-title">Hotspots</h5>
-                    <p class="card-text display-6 fw-bold">5 locaties</p>
+                    <h5 class="card-title">Top Hotspots</h5>
+                    @if (TopLocations.Any())
+                    {
+                        @foreach (var location in TopLocations)
+                        {
+                            <p class="card-text fw-bold mb-1">@location.LocationName</p>
+                            <p class="text-muted small mb-2">@location.Percentage.ToString("F1")%</p>
+                        }
+                    }
+                    else
+                    {
+                        <p class="card-text fw-bold">Geen data</p>
+                    }
                     <p class="text-muted small mb-0">Meeste afval gemeld</p>
                 </div>
             </div>
@@ -161,10 +172,6 @@
     </div>
 </div>
 
-@code {
-
-}
-
 <style>
     .text-purple {
         color: #634AFF;
@@ -220,5 +227,55 @@
         {
             Console.WriteLine($"Error loading trash data: {ex.Message}");
         }
+    }
+
+    private List<(string LocationName, double Percentage)> GetTopLocations(int topCount = 2)
+    {
+        if (!trashItems.Any())
+            return new List<(string LocationName, double Percentage)>();
+
+        var totalCount = trashItems.Count;
+        
+        var locationCounts = trashItems
+            .GroupBy(item => GetLocationName(item.Latitude, item.Longitude))
+            .Select(group => new { 
+                LocationName = group.Key, 
+                Count = group.Count(),
+                Percentage = (double)group.Count() / totalCount * 100
+            })
+            .OrderByDescending(x => x.Count)
+            .Take(topCount)
+            .Select(x => (x.LocationName, x.Percentage))
+            .ToList();
+        
+        return locationCounts;
+    }
+
+    private List<(string LocationName, double Percentage)> TopLocations => GetTopLocations(2);
+
+    private string GetLocationName(float latitude, float longitude)
+    {
+        // Breda: Grote Markt (updated range)
+        if (latitude >= 51.5890 && latitude <= 51.5900 && longitude >= 4.7750 && longitude <= 4.7765)
+            return "Grote Markt Breda";
+        // Breda: Centraal Station
+        if (latitude >= 51.5953 && latitude <= 51.5963 && longitude >= 4.7787 && longitude <= 4.7797)
+            return "Centraal Station Breda";
+        // Breda: Valkenberg Park
+        if (latitude >= 51.5929 && latitude <= 51.5939 && longitude >= 4.7791 && longitude <= 4.7801)
+            return "Valkenberg Park";
+        // Breda: Haagdijk (updated range)
+        if (latitude >= 51.5920 && latitude <= 51.5925 && longitude >= 4.7685 && longitude <= 4.7695)
+            return "Haagdijk";
+        // Breda: Chassé Park (new)
+        if (latitude >= 51.5860 && latitude <= 51.5866 && longitude >= 4.7848 && longitude <= 4.7856)
+            return "Chassé Park";
+        // Breda: Chasséveld (existing)
+        if (latitude >= 51.5890 && latitude <= 51.5902 && longitude >= 4.7750 && longitude <= 4.7766)
+            return "Chasséveld";
+        // Default locations for other coordinates
+        var random = new Random((int)(latitude * 1000 + longitude * 1000));
+        var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
+        return locations[random.Next(locations.Length)];
     }
 }
