@@ -1,5 +1,9 @@
 ﻿@page "/dashboard"
 @using WasteWatchAIFrontend.Models
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject IJSRuntime JSRuntime
+@inject IHttpClientFactory HttpClientFactory
 @rendermode InteractiveServer
 
 <PageTitle>Dashboard</PageTitle>
@@ -51,13 +55,13 @@
                     {
                         @foreach (var litterType in TopLitterTypes)
                         {
-                                    <p class="card-text fw-bold mb-1">@litterType.LitterType</p>
-                                    <p class="text-muted small mb-2">@litterType.Percentage.ToString("F1")%</p>
+                            <p class="card-text fw-bold mb-1">@litterType.LitterType</p>
+                            <p class="text-muted small mb-2">@litterType.Percentage.ToString("F1")%</p>
                         }
                     }
                     else
                     {
-                            <p class="card-text fw-bold">Geen data</p>
+                        <p class="card-text fw-bold">Geen data</p>
                     }
                 </div>
             </div>
@@ -71,13 +75,13 @@
                     {
                         @foreach (var location in TopLocations)
                         {
-                                    <p class="card-text fw-bold mb-1">@location.LocationName</p>
-                                    <p class="text-muted small mb-2">@location.Percentage.ToString("F1")%</p>
+                            <p class="card-text fw-bold mb-1">@location.LocationName</p>
+                            <p class="text-muted small mb-2">@location.Percentage.ToString("F1")%</p>
                         }
                     }
                     else
                     {
-                            <p class="card-text fw-bold">Geen data</p>
+                        <p class="card-text fw-bold">Geen data</p>
                     }
                 </div>
             </div>
@@ -139,84 +143,84 @@
 
                     @if (LocationAlerts.Any())
                     {
-                            <div class="table-responsive">
-                                <table class="table table-borderless table-custom mb-0">
-                                    <thead>
-                                        <tr class="text-muted small">
-                                            <th>Locatie</th>
-                                            <th>Status</th>
-                                            <th>Afgelopen uur</th>
-                                            <th>Afgelopen 24u</th>
-                                            <th>Totaal</th>
-                                            <th>Laatste melding</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                        <div class="table-responsive">
+                            <table class="table table-borderless table-custom mb-0">
+                                <thead>
+                                    <tr class="text-muted small">
+                                        <th>Locatie</th>
+                                        <th>Status</th>
+                                        <th>Afgelopen uur</th>
+                                        <th>Afgelopen 24u</th>
+                                        <th>Totaal</th>
+                                        <th>Laatste melding</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
                                     @foreach (var alert in LocationAlerts.OrderByDescending(a => a.Priority).ThenByDescending(a => a.LastAlert))
                                     {
-                                                <tr>
-                                                    <td class="fw-bold">@alert.LocationName</td>
-                                                    <td>
+                                        <tr>
+                                            <td class="fw-bold">@alert.LocationName</td>
+                                            <td>
                                                 @if (alert.Priority == "Hoog")
                                                 {
-                                                                <span class="badge bg-danger">@alert.Priority</span>
+                                                    <span class="badge bg-danger">@alert.Priority</span>
                                                 }
                                                 else if (alert.Priority == "Gemiddeld")
                                                 {
-                                                                <span class="badge bg-warning text-dark">@alert.Priority</span>
+                                                    <span class="badge bg-warning text-dark">@alert.Priority</span>
                                                 }
                                                 else
                                                 {
-                                                                <span class="badge bg-success">@alert.Priority</span>
+                                                    <span class="badge bg-success">@alert.Priority</span>
                                                 }
-                                                    </td>
-                                                    <td>
-                                                        <span class="fw-bold">@alert.CountLastHour</span>
+                                            </td>
+                                            <td>
+                                                <span class="fw-bold">@alert.CountLastHour</span>
                                                 @if (alert.CountLastHour > 0)
                                                 {
-                                                                <small class="text-muted">melding@(alert.CountLastHour != 1 ? "en" : "")</small>
+                                                    <small class="text-muted">melding@(alert.CountLastHour != 1 ? "en" : "")</small>
                                                 }
-                                                    </td>
-                                                    <td>
-                                                        <span class="fw-bold">@alert.CountLast24Hours</span>
+                                            </td>
+                                            <td>
+                                                <span class="fw-bold">@alert.CountLast24Hours</span>
                                                 @if (alert.CountLast24Hours > 0)
                                                 {
-                                                                <small class="text-muted">melding@(alert.CountLast24Hours != 1 ? "en" : "")</small>
+                                                    <small class="text-muted">melding@(alert.CountLast24Hours != 1 ? "en" : "")</small>
                                                 }
-                                                    </td>
-                                                    <td>
-                                                        <span class="fw-bold">@alert.TotalCount</span>
-                                                        <small class="text-muted">totaal</small>
-                                                    </td>
-                                                    <td class="text-muted small">
+                                            </td>
+                                            <td>
+                                                <span class="fw-bold">@alert.TotalCount</span>
+                                                <small class="text-muted">totaal</small>
+                                            </td>
+                                            <td class="text-muted small">
                                                 @if (alert.LastAlert.HasValue)
                                                 {
                                                     @alert.LastAlert.Value.ToString("HH:mm")
                                                 }
                                                 else
                                                 {
-                                                                <span>-</span>
+                                                    <span>-</span>
                                                 }
-                                                    </td>
-                                                </tr>
+                                            </td>
+                                        </tr>
                                     }
-                                    </tbody>
-                                </table>
-                            </div>
+                                </tbody>
+                            </table>
+                        </div>
 
-                            <div class="mt-3 text-muted small">
-                                <div class="d-flex gap-4">
-                                    <div><span class="badge bg-danger me-1"></span>Hoog: 3+ meldingen afgelopen uur</div>
-                                    <div><span class="badge bg-warning me-1"></span>Gemiddeld: 1-2 meldingen afgelopen uur</div>
-                                    <div><span class="badge bg-success me-1"></span>Laag: geen recente meldingen</div>
-                                </div>
+                        <div class="mt-3 text-muted small">
+                            <div class="d-flex gap-4">
+                                <div><span class="badge bg-danger me-1"></span>Hoog: 3+ meldingen afgelopen uur</div>
+                                <div><span class="badge bg-warning me-1"></span>Gemiddeld: 1-2 meldingen afgelopen uur</div>
+                                <div><span class="badge bg-success me-1"></span>Laag: geen recente meldingen</div>
                             </div>
+                        </div>
                     }
                     else
                     {
-                            <div class="text-center text-muted py-4">
-                                <div>Geen actieve waarschuwingen</div>
-                            </div>
+                        <div class="text-center text-muted py-4">
+                            <div>Geen actieve waarschuwingen</div>
+                        </div>
                     }
                 </div>
             </div>
@@ -227,11 +231,9 @@
         <div class="col-md-6 mb-4 mb-md-0">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
-                    <h5 class="card-title fw-bold mb-4">Kerncijfers & trends</h5>
-                    <div class="bg-light rounded p-4 d-flex justify-content-center align-items-center" style="height: 250px;">
-                        <div class="text-center text-muted">
-                            <div>Grafiek placeholder</div>
-                        </div>
+                    <h5 class="card-title fw-bold mb-4">Verdeling afvaltypes</h5>
+                    <div class="chart-container" style="position: relative; height:250px; width:100%">
+                        <canvas id="litterTypeChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -282,8 +284,6 @@
 </style>
 
 @code {
-    [Inject] private IHttpClientFactory HttpClientFactory { get; set; } = default!;
-
     private List<TrashItem> trashItems = new();
     private List<TrashItem> trashItemsLast30Days = new();
     private List<TrashItem> filteredTrashItems = new();
@@ -307,6 +307,8 @@
     private bool showAlert = false;
     private string alertMessage = string.Empty;
     private List<string> notifiedHighAlerts = new();
+    private IJSObjectReference? _chartModule;
+    private IJSObjectReference? _chartInstance;
 
     protected override async Task OnInitializedAsync()
     {
@@ -320,9 +322,63 @@
             {
                 await LoadDummyTrashData();
                 CheckForHighPriorityAlerts();
+                await UpdateChart();
                 StateHasChanged();
             });
         }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _chartModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./chartInterop.js");
+            await UpdateChart();
+        }
+    }
+
+    private async Task UpdateChart()
+    {
+        try
+        {
+            if (_chartModule is not null)
+            {
+                if (_chartInstance is not null)
+                {
+                    await _chartInstance.InvokeVoidAsync("destroy");
+                    await _chartInstance.DisposeAsync();
+                    _chartInstance = null;
+                }
+
+                var counts = GetLitterTypeCounts();
+                if (counts.Any())
+                {
+                    _chartInstance = await _chartModule.InvokeAsync<IJSObjectReference>(
+                        "setupLitterTypeChart",
+                        counts.Keys.ToArray(),
+                        counts.Values.ToArray());
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating chart: {ex.Message}");
+        }
+    }
+
+    private Dictionary<string, int> GetLitterTypeCounts()
+    {
+        if (!trashItems.Any())
+            return new Dictionary<string, int>();
+
+        return trashItems
+            .GroupBy(item => item.LitterType)
+            .OrderByDescending(group => group.Count())
+            .ToDictionary(
+                group => group.Key,
+                group => group.Count()
+            );
     }
 
     private void CheckForHighPriorityAlerts()
@@ -353,9 +409,27 @@
         }
     }
 
-    public void Dispose()
+    public async void Dispose()
     {
         refreshTimer?.Dispose();
+
+        try
+        {
+            if (_chartInstance is not null)
+            {
+                await _chartInstance.InvokeVoidAsync("destroy");
+                await _chartInstance.DisposeAsync();
+            }
+
+            if (_chartModule is not null)
+            {
+                await _chartModule.DisposeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during disposal: {ex.Message}");
+        }
     }
 
     private async Task LoadDummyTrashData()
@@ -436,7 +510,7 @@
         if (!trashItems.Any())
             return new List<LocationAlert>();
 
-        var now = DateTime.Now; 
+        var now = DateTime.Now;
         var oneHourAgo = now.AddHours(-1);
         var twentyFourHoursAgo = now.AddHours(-24);
 
