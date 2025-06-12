@@ -38,9 +38,19 @@
         <div class="col-sm-6 col-lg-3 mb-3">
             <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
                 <div class="card-body">
-                    <h5 class="card-title">Afvaltypes</h5>
-                    <p class="card-text fw-bold">Plastic, Papier, Glas</p>
-                    <p class="text-muted small mb-0">Meest voorkomende types</p>
+                    <h5 class="card-title">Top Afvaltypes</h5>
+                    @if (TopLitterTypes.Any())
+                    {
+                        @foreach (var litterType in TopLitterTypes)
+                        {
+                            <p class="card-text fw-bold mb-1">@litterType.LitterType</p>
+                            <p class="text-muted small mb-2">@litterType.Percentage.ToString("F1")%</p>
+                        }
+                    }
+                    else
+                    {
+                        <p class="card-text fw-bold">Geen data</p>
+                    }
                 </div>
             </div>
         </div>
@@ -61,7 +71,6 @@
                     {
                         <p class="card-text fw-bold">Geen data</p>
                     }
-                    <p class="text-muted small mb-0">Meeste afval gemeld</p>
                 </div>
             </div>
         </div>
@@ -228,6 +237,30 @@
             Console.WriteLine($"Error loading trash data: {ex.Message}");
         }
     }
+
+    private List<(string LitterType, double Percentage)> GetTopLitterTypes(int topCount = 2)
+    {
+        if (!trashItems.Any())
+            return new List<(string LitterType, double Percentage)>();
+
+        var totalCount = trashItems.Count;
+        
+        var litterTypeCounts = trashItems
+            .GroupBy(item => item.LitterType)
+            .Select(group => new { 
+                LitterType = group.Key, 
+                Count = group.Count(),
+                Percentage = (double)group.Count() / totalCount * 100
+            })
+            .OrderByDescending(x => x.Count)
+            .Take(topCount)
+            .Select(x => (x.LitterType, x.Percentage))
+            .ToList();
+        
+        return litterTypeCounts;
+    }
+
+    private List<(string LitterType, double Percentage)> TopLitterTypes => GetTopLitterTypes(2);
 
     private List<(string LocationName, double Percentage)> GetTopLocations(int topCount = 2)
     {
