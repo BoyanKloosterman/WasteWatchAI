@@ -27,33 +27,23 @@
     </div>
 
     <div class="row mb-4">
-        <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="col-sm-6 col-lg-4 mb-4">
             <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
                 <div class="card-body">
-                    <h5 class="card-title">Totaal afval</h5>
-                    <p class="card-text display-6 fw-bold">@trashItems.Count</p>
-                    <p class="text-muted small mb-0">Gedetecteerd in totaal</p>
+                    <h5 class="card-title">@GetTotalLabel()</h5>
+                    <p class="card-text display-6 fw-bold">@GetFilteredData().Count</p>
+                    <p class="text-muted small mb-0">@GetTotalSubLabel()</p>
                 </div>
             </div>
         </div>
 
-        <div class="col-sm-6 col-lg-3 mb-3">
-            <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
-                <div class="card-body">
-                    <h5 class="card-title">Afgelopen 30d afval</h5>
-                    <p class="card-text display-6 fw-bold">@trashItemsLast30Days.Count</p>
-                    <p class="text-muted small mb-0">Gedetecteerd afgelopen 30d</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="col-sm-6 col-lg-4 mb-4">
             <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
                 <div class="card-body">
                     <h5 class="card-title">Top Afvaltypes</h5>
-                    @if (TopLitterTypes.Any())
+                    @if (GetTopLitterTypes().Any())
                     {
-                        @foreach (var litterType in TopLitterTypes)
+                        @foreach (var litterType in GetTopLitterTypes())
                         {
                             <p class="card-text fw-bold mb-1">@litterType.LitterType</p>
                             <p class="text-muted small mb-2">@litterType.Percentage.ToString("F1")%</p>
@@ -67,13 +57,13 @@
             </div>
         </div>
 
-        <div class="col-sm-6 col-lg-3 mb-3">
+        <div class="col-sm-6 col-lg-4 mb-4">
             <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
                 <div class="card-body">
                     <h5 class="card-title">Top Hotspots</h5>
-                    @if (TopLocations.Any())
+                    @if (GetTopLocations().Any())
                     {
-                        @foreach (var location in TopLocations)
+                        @foreach (var location in GetTopLocations())
                         {
                             <p class="card-text fw-bold mb-1">@location.LocationName</p>
                             <p class="text-muted small mb-2">@location.Percentage.ToString("F1")%</p>
@@ -91,21 +81,21 @@
     <div class="card shadow-sm mb-4">
         <div class="card-body">
             <div class="row g-3 align-items-end">
-                <div class="col-sm-6 col-md-3">
+                <div class="col-sm-6 col-md-4">
                     <label class="form-label fw-bold">Afvaltype</label>
-                    <select class="form-select" @bind="selectedLitterType">
-                        <option value="">Selecteer type</option>
+                    <select class="form-select" @bind="selectedLitterType" @bind:after="OnFilterChanged">
+                        <option value="">Alle types</option>
                         <option value="Plastic">Plastic</option>
                         <option value="Papier">Papier</option>
                         <option value="Glas">Glas</option>
-                        <option value="Restafval">Restafval</option>
+                        <option value="Organisch">Organisch</option>
                     </select>
                 </div>
 
-                <div class="col-sm-6 col-md-3">
+                <div class="col-sm-6 col-md-4">
                     <label class="form-label fw-bold">Locatie</label>
-                    <select class="form-select" @bind="selectedLocation">
-                        <option value="">Kies locatie</option>
+                    <select class="form-select" @bind="selectedLocation" @bind:after="OnFilterChanged">
+                        <option value="">Alle locaties</option>
                         <option value="Grote Markt Breda">Grote Markt Breda</option>
                         <option value="Centraal Station Breda">Centraal Station Breda</option>
                         <option value="Valkenberg Park">Valkenberg Park</option>
@@ -115,21 +105,15 @@
                     </select>
                 </div>
 
-                <div class="col-sm-6 col-md-3">
+                <div class="col-sm-6 col-md-4">
                     <label class="form-label fw-bold">Datum</label>
-                    <select class="form-select" @bind="selectedDateRange">
-                        <option value="">Selecteer datum</option>
+                    <select class="form-select" @bind="selectedDateRange" @bind:after="OnFilterChanged">
+                        <option value="">Alle periodes</option>
                         <option value="Vandaag">Vandaag</option>
                         <option value="Deze week">Deze week</option>
                         <option value="Deze maand">Deze maand</option>
                         <option value="Dit jaar">Dit jaar</option>
                     </select>
-                </div>
-
-                <div class="col-sm-6 col-md-3">
-                    <button class="btn w-100" style="background-color: #634AFF; color: white;" @onclick="ApplyFilters">
-                        Toepassen
-                    </button>
                 </div>
             </div>
         </div>
@@ -141,7 +125,7 @@
                 <div class="card-body">
                     <h5 class="card-title fw-bold mb-4">Actieve Realtime waarschuwingen</h5>
 
-                    @if (LocationAlerts.Any())
+                    @if (GetLocationAlerts().Any())
                     {
                         <div class="table-responsive">
                             <table class="table table-borderless table-custom mb-0">
@@ -156,7 +140,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var alert in LocationAlerts.OrderByDescending(a => a.Priority).ThenByDescending(a => a.LastAlert))
+                                    @foreach (var alert in GetLocationAlerts().OrderByDescending(a => a.Priority).ThenByDescending(a => a.LastAlert))
                                     {
                                         <tr>
                                             <td class="fw-bold">@alert.LocationName</td>
@@ -285,10 +269,9 @@
 
 @code {
     private List<TrashItem> trashItems = new();
-    private List<TrashItem> trashItemsLast30Days = new();
     private List<TrashItem> filteredTrashItems = new();
+    private bool filtersApplied = false;
 
-    // Filter variabelen
     private string selectedLitterType = "";
     private string selectedLocation = "";
     private string selectedDateRange = "";
@@ -315,7 +298,6 @@
         await LoadDummyTrashData();
         CheckForHighPriorityAlerts();
 
-        // Start timer om elke minuut data te verversen
         refreshTimer = new System.Threading.Timer(async _ =>
         {
             await InvokeAsync(async () =>
@@ -369,10 +351,12 @@
 
     private Dictionary<string, int> GetLitterTypeCounts()
     {
-        if (!trashItems.Any())
+        var dataToUse = GetFilteredData();
+
+        if (!dataToUse.Any())
             return new Dictionary<string, int>();
 
-        return trashItems
+        return dataToUse
             .GroupBy(item => item.LitterType)
             .OrderByDescending(group => group.Count())
             .ToDictionary(
@@ -381,9 +365,70 @@
             );
     }
 
+    private List<TrashItem> GetFilteredData()
+    {
+        return filtersApplied ? filteredTrashItems : trashItems;
+    }
+
+    private string GetTotalLabel()
+    {
+        if (!filtersApplied || string.IsNullOrEmpty(selectedDateRange))
+            return "Totaal afval";
+
+        return selectedDateRange switch
+        {
+            "Vandaag" => "Afval vandaag",
+            "Deze week" => "Afval deze week",
+            "Deze maand" => "Afval deze maand",
+            "Dit jaar" => "Afval dit jaar",
+            _ => "Totaal afval"
+        };
+    }
+
+    private string GetTotalSubLabel()
+    {
+        if (!filtersApplied || string.IsNullOrEmpty(selectedDateRange))
+            return "Gedetecteerd in totaal";
+
+        return selectedDateRange switch
+        {
+            "Vandaag" => "Gedetecteerd vandaag",
+            "Deze week" => "Gedetecteerd deze week",
+            "Deze maand" => "Gedetecteerd deze maand",
+            "Dit jaar" => "Gedetecteerd dit jaar",
+            _ => "Gedetecteerd in totaal"
+        };
+    }
+
+    private int GetLast30DaysCount()
+    {
+        var now = DateTime.UtcNow;
+        var dertigDagenGeleden = now.AddDays(-30);
+
+        var baseData = GetFilteredData();
+
+        var last30DaysData = trashItems.AsQueryable();
+
+        if (!string.IsNullOrEmpty(selectedLocation))
+        {
+            last30DaysData = last30DaysData.Where(item =>
+                GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrEmpty(selectedLitterType))
+        {
+            last30DaysData = last30DaysData.Where(item =>
+                item.LitterType.Equals(selectedLitterType, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return last30DaysData
+            .Where(item => item.Timestamp >= dertigDagenGeleden && item.Timestamp <= now)
+            .Count();
+    }
+
     private void CheckForHighPriorityAlerts()
     {
-        var highAlerts = LocationAlerts
+        var highAlerts = GetLocationAlerts()
             .Where(a => a.Priority == "Hoog" && !notifiedHighAlerts.Contains(a.LocationName))
             .ToList();
 
@@ -441,12 +486,6 @@
             if (response.IsSuccessStatusCode)
             {
                 trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
-
-                var now = DateTime.UtcNow;
-                var dertigDagenGeleden = now.AddDays(-30);
-                trashItemsLast30Days = trashItems
-                    .Where(item => item.Timestamp >= dertigDagenGeleden && item.Timestamp <= now)
-                    .ToList();
             }
         }
         catch (Exception ex)
@@ -455,11 +494,15 @@
         }
     }
 
-    private void ApplyFilters()
+    private async Task OnFilterChanged()
+    {
+        await ApplyFilters();
+    }
+
+    private async Task ApplyFilters()
     {
         filteredTrashItems = trashItems.AsQueryable().ToList();
 
-        // Filter op afvaltype
         if (!string.IsNullOrEmpty(selectedLitterType))
         {
             filteredTrashItems = filteredTrashItems
@@ -467,7 +510,6 @@
                 .ToList();
         }
 
-        // Filter op locatie
         if (!string.IsNullOrEmpty(selectedLocation))
         {
             filteredTrashItems = filteredTrashItems
@@ -475,46 +517,58 @@
                 .ToList();
         }
 
-        // Filter op datumbereik
         if (!string.IsNullOrEmpty(selectedDateRange))
         {
             var now = DateTime.Now;
             DateTime startDate = now;
+            DateTime endDate = now;
 
             switch (selectedDateRange)
             {
                 case "Vandaag":
                     startDate = now.Date;
+                    endDate = now.Date.AddDays(1).AddTicks(-1);
                     break;
                 case "Deze week":
                     startDate = now.AddDays(-(int)now.DayOfWeek).Date;
+                    endDate = startDate.AddDays(7).AddTicks(-1);
                     break;
                 case "Deze maand":
                     startDate = new DateTime(now.Year, now.Month, 1);
+                    endDate = startDate.AddMonths(1).AddTicks(-1);
                     break;
                 case "Dit jaar":
                     startDate = new DateTime(now.Year, 1, 1);
+                    endDate = startDate.AddYears(1).AddTicks(-1);
                     break;
             }
 
             filteredTrashItems = filteredTrashItems
-                .Where(item => item.Timestamp >= startDate)
+                .Where(item => item.Timestamp >= startDate && item.Timestamp <= endDate)
                 .ToList();
         }
 
-        Console.WriteLine($"Totaal aantal gefilterde items: {filteredTrashItems.Count}");
+        filtersApplied = !string.IsNullOrEmpty(selectedLitterType) ||
+                        !string.IsNullOrEmpty(selectedLocation) ||
+                        !string.IsNullOrEmpty(selectedDateRange);
+
+        await UpdateChart();
+
+        Console.WriteLine($"Filters toegepast - Totaal aantal items: {filteredTrashItems.Count}, Filters actief: {filtersApplied}");
     }
 
     private List<LocationAlert> GetLocationAlerts()
     {
-        if (!trashItems.Any())
+        var dataToUse = GetFilteredData();
+
+        if (!dataToUse.Any())
             return new List<LocationAlert>();
 
         var now = DateTime.Now;
         var oneHourAgo = now.AddHours(-1);
         var twentyFourHoursAgo = now.AddHours(-24);
 
-        var locationGroups = trashItems
+        var locationGroups = dataToUse
             .GroupBy(item => GetLocationName(item.Latitude, item.Longitude))
             .ToList();
 
@@ -539,7 +593,7 @@
                     CountLast24Hours = last24HourItems.Count,
                     TotalCount = locationItems.Count,
                     LastAlert = locationItems.Where(item => item.Timestamp <= now).Any() ?
-                               locationItems.Where(item => item.Timestamp <= now).Max(item => item.Timestamp) : null
+                                       locationItems.Where(item => item.Timestamp <= now).Max(item => item.Timestamp) : null
                 };
 
             if (alert.CountLastHour >= 3)
@@ -561,16 +615,16 @@
         return alerts;
     }
 
-    private List<LocationAlert> LocationAlerts => GetLocationAlerts();
-
     private List<(string LitterType, double Percentage)> GetTopLitterTypes(int topCount = 2)
     {
-        if (!trashItems.Any())
+        var dataToUse = GetFilteredData();
+
+        if (!dataToUse.Any())
             return new List<(string LitterType, double Percentage)>();
 
-        var totalCount = trashItems.Count;
+        var totalCount = dataToUse.Count;
 
-        var litterTypeCounts = trashItems
+        var litterTypeCounts = dataToUse
             .GroupBy(item => item.LitterType)
             .Select(group => new
             {
@@ -586,16 +640,16 @@
         return litterTypeCounts;
     }
 
-    private List<(string LitterType, double Percentage)> TopLitterTypes => GetTopLitterTypes(2);
-
     private List<(string LocationName, double Percentage)> GetTopLocations(int topCount = 2)
     {
-        if (!trashItems.Any())
+        var dataToUse = GetFilteredData();
+
+        if (!dataToUse.Any())
             return new List<(string LocationName, double Percentage)>();
 
-        var totalCount = trashItems.Count;
+        var totalCount = dataToUse.Count;
 
-        var locationCounts = trashItems
+        var locationCounts = dataToUse
             .GroupBy(item => GetLocationName(item.Latitude, item.Longitude))
             .Select(group => new
             {
@@ -610,8 +664,6 @@
 
         return locationCounts;
     }
-
-    private List<(string LocationName, double Percentage)> TopLocations => GetTopLocations(2);
 
     private string GetLocationName(float latitude, float longitude)
     {
