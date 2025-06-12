@@ -1,5 +1,6 @@
 @page "/map"
 @rendermode InteractiveServer
+@inject IJSRuntime JS
 @* @using WasteWatchAIFrontend.Components.Pages *@
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -38,7 +39,13 @@
 
 
 @code {
-
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("initializeMap");
+        }
+    }
 }
 
 
