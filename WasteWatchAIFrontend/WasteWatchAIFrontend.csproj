@@ -4,6 +4,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>b121046f-c3fd-473f-a346-ace5bed8a22b</UserSecretsId>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="wwwroot\map.js" />
+  </ItemGroup>
 
 </Project>

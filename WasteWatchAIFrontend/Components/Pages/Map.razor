@@ -1,0 +1,75 @@
+@page "/map"
+@rendermode InteractiveServer
+@* @using WasteWatchAIFrontend.Components.Pages *@
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin="" />
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+
+
+
+<PageTitle>Map</PageTitle>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 fw-bold">Afvalbeheer Map</h1>
+        @* <div class="text-muted small">Laatste update: 10:12</div> *@
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
+                <div class="card-body">
+
+                    <div id="map">
+                        <script src="js/map.js"></script>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+
+}
+
+
+
+
+<style>
+    #map {
+        height: 360px;
+    }
+</style>
+
+@*<style>
+    .text-purple {
+        color: #634AFF;
+    }
+
+    .btn-purple {
+        background-color: #634AFF;
+        color: white;
+    }
+
+        .btn-purple:hover {
+            background-color: #5538e0;
+            color: white;
+        }
+
+    .border-purple {
+        border-color: #634AFF !important;
+    }
+
+    .table-custom tr:not(:last-child) td {
+        border-bottom: 1px solid #dee2e6;
+    }
+</style>*@
