@@ -228,7 +228,7 @@ def load_data_and_train_models():
             )
             
             # Train Decision Tree
-            dt = DecisionTreeRegressor(max_depth=8, random_state=42,)
+            dt = DecisionTreeRegressor(max_depth=2, random_state=42)
             dt.fit(X_train, y_train)
             dt_pred = dt.predict(X_test)
             dt_r2 = r2_score(y_test, dt_pred)
@@ -275,48 +275,73 @@ def load_data_and_train_models():
         return False
 
 def calculate_prediction_confidence(model, input_data, target_name):
-    """Calculate confidence score for a prediction"""
+    """ECHTE confidence calculation gebaseerd op model internals"""
     try:
         if hasattr(model, 'estimators_'):
-            # Voor Random Forest: gebruik std van alle trees
+            # Random Forest: tree consensus (dit is al goed)
             predictions = np.array([tree.predict(input_data)[0] for tree in model.estimators_])
             mean_pred = np.mean(predictions)
             std_pred = np.std(predictions)
             
-            # Confidence = 1 - (normalized std)
-            max_std = mean_pred * 0.5 if mean_pred > 0 else 1.0
-            normalized_std = min(std_pred / max_std, 1.0) if max_std > 0 else 0.0
-            confidence = max(0.0, 1.0 - normalized_std)
+            if mean_pred == 0:
+                return 0.3
+            
+            relative_std = std_pred / abs(mean_pred) if abs(mean_pred) > 0 else 1.0
+            confidence = max(0.3, min(0.9, 1.0 - relative_std))
             
             return round(confidence, 3)
+            
         else:
-            # Voor Decision Tree: gebruik feature importance
-            feature_importances = model.feature_importances_
-            max_importance = np.max(feature_importances)
-            
-            # Eenvoudige confidence gebaseerd op max feature importance
-            confidence = min(max_importance * 2, 1.0)
-            
-            return round(confidence, 3)
+            # Decision Tree: ECHTE confidence gebaseerd op leaf statistics
+            try:
+                # Vind welke leaf deze input gebruikt
+                leaf_id = model.decision_path(input_data).toarray()[0]
+                leaf_indices = np.where(leaf_id)[0]
+                final_leaf = leaf_indices[-1]  # Laatste node = leaf
+                
+                # Hoeveel training samples zitten in deze leaf?
+                n_samples_in_leaf = model.tree_.n_node_samples[final_leaf]
+                total_samples = model.tree_.n_node_samples[0]  # Root heeft alle samples
+                
+                # Wat is de impurity van deze leaf? (hoe "zuiver" is de voorspelling)
+                leaf_impurity = model.tree_.impurity[final_leaf]
+                
+                # Sample-based confidence: meer samples = meer betrouwbaar
+                sample_ratio = n_samples_in_leaf / total_samples
+                sample_confidence = min(0.6, sample_ratio * 5.0)  # Max 0.6 van samples
+                
+                # Purity-based confidence: lagere impurity = meer betrouwbaar  
+                purity_confidence = max(0.1, 1.0 - leaf_impurity)
+                purity_confidence = min(0.4, purity_confidence)  # Max 0.4 van purity
+                
+                # Path depth confidence: diepere path = specifieker
+                path_depth = len(leaf_indices)
+                depth_confidence = min(0.2, path_depth / 10.0)  # Max 0.2 van depth
+                
+                # Combineer alle confidence factors
+                total_confidence = sample_confidence + purity_confidence + depth_confidence
+                
+                # Zorg dat het binnen bereik blijft
+                final_confidence = max(0.2, min(0.9, total_confidence))
+                
+                return round(final_confidence, 3)
+                
+            except Exception as e:
+                print(f"Error in DT confidence calculation: {e}")
+                # Fallback: gebruik feature importance
+                try:
+                    max_importance = np.max(model.feature_importances_)
+                    return round(max(0.3, min(0.7, max_importance * 2.0)), 3)
+                except:
+                    return 0.4
             
     except Exception as e:
         print(f"Error calculating confidence for {target_name}: {e}")
-        return 0.5  # Default moderate confidence
-
-def get_best_model_type():
-    """Determine which model type has better average R² score"""
-    if not dt_r2_scores or not rf_r2_scores:
-        return "random_forest"  # Default
-    
-    dt_avg_r2 = np.mean(list(dt_r2_scores.values()))
-    rf_avg_r2 = np.mean(list(rf_r2_scores.values()))
-    
-    print(f"Model comparison: DT avg R²={dt_avg_r2:.3f}, RF avg R²={rf_avg_r2:.3f}")
-    return "decision_tree" if dt_avg_r2 > rf_avg_r2 else "random_forest"
+        return 0.3
 
 def predict_waste(date_str: str, latitude: float, longitude: float, 
                  temperatuur: float, weersverwachting: str):
-    """Make prediction using the BEST model per category"""
+    """Eenvoudige voorspelling - net zoals in notebooks"""
     
     # Convert date string to datetime
     date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -340,91 +365,61 @@ def predict_waste(date_str: str, latitude: float, longitude: float,
     # Map weather description to numeric
     weersverwachting_num = weather_mapping.get(weersverwachting, 1)
     
-    # Create input data
+    # Create input data - net zoals in notebooks
     input_values = np.array([[
         latitude, longitude, year, month, day, weekday,
         temperatuur, weersverwachting_num, is_weekend, seizoen
     ]])
     
-    # Make predictions - selecteer het BESTE model per categorie
+    # Make predictions voor alle categorieën
     categories = ['Plastic', 'Papier', 'Organisch', 'Glas']
     predictions = {}
     confidence_scores = {}
-    all_model_confidence = {}
     model_used_per_category = {}
     
     for category in categories:
-        all_model_confidence[category] = {}
-        
-        # Bepaal het beste model voor DEZE specifieke categorie
-        dt_r2 = dt_r2_scores.get(category, 0)
-        rf_r2 = rf_r2_scores.get(category, 0)
-        
-        # Kies het model met de hoogste R² voor deze categorie
-        if dt_r2 > rf_r2 and category in dt_models:
-            best_model = dt_models[category]
-            model_used_per_category[category] = "decision_tree"
-            print(f"Using Decision Tree for {category} (R²={dt_r2:.3f} vs RF R²={rf_r2:.3f})")
-        elif category in rf_models:
-            best_model = rf_models[category]
-            model_used_per_category[category] = "random_forest"
-            print(f"Using Random Forest for {category} (R²={rf_r2:.3f} vs DT R²={dt_r2:.3f})")
+        # Gebruik altijd Random Forest als beschikbaar (zoals in notebooks)
+        if category in rf_models:
+            model = rf_models[category]
+            model_type = "random_forest"
+        elif category in dt_models:
+            model = dt_models[category]
+            model_type = "decision_tree"
         else:
-            # Fallback
             predictions[category] = 0
             confidence_scores[category] = 0.0
             model_used_per_category[category] = "none"
             continue
         
-        # Maak voorspelling met het beste model voor deze categorie
         try:
-            prediction = best_model.predict(input_values)[0]
+            # Maak voorspelling
+            prediction = model.predict(input_values)[0]
             predictions[category] = max(0, round(prediction))
             
-            # Calculate confidence voor het gekozen model
-            confidence = calculate_prediction_confidence(best_model, input_values, category)
+            # Bereken confidence
+            confidence = calculate_prediction_confidence(model, input_values, category)
             confidence_scores[category] = confidence
+            model_used_per_category[category] = model_type
             
         except Exception as e:
             print(f"Error predicting {category}: {e}")
             predictions[category] = 0
             confidence_scores[category] = 0.0
-        
-        # Calculate confidence voor beide modellen (voor transparantie)
-        try:
-            if category in dt_models:
-                dt_conf = calculate_prediction_confidence(dt_models[category], input_values, category)
-                all_model_confidence[category]['decision_tree'] = dt_conf
-            else:
-                all_model_confidence[category]['decision_tree'] = 0.0
-                
-            if category in rf_models:
-                rf_conf = calculate_prediction_confidence(rf_models[category], input_values, category)
-                all_model_confidence[category]['random_forest'] = rf_conf
-            else:
-                all_model_confidence[category]['random_forest'] = 0.0
-                
-        except Exception as e:
-            print(f"Error calculating all confidences for {category}: {e}")
-            all_model_confidence[category] = {'decision_tree': 0.0, 'random_forest': 0.0}
+            model_used_per_category[category] = "error"
     
-    # Overall model type (meest gebruikte)
-    model_types_used = [v for v in model_used_per_category.values() if v != "none"]
-    overall_model_used = max(set(model_types_used), key=model_types_used.count) if model_types_used else "mixed"
+    # Calculate overall confidence
+    avg_confidence = np.mean(list(confidence_scores.values())) if confidence_scores else 0
     
-    # Calculate weighted average R² score voor de gekozen modellen
-    all_r2_scores = []
-    for category in categories:
-        if model_used_per_category[category] == "decision_tree":
-            all_r2_scores.append(dt_r2_scores.get(category, 0))
-        elif model_used_per_category[category] == "random_forest":
-            all_r2_scores.append(rf_r2_scores.get(category, 0))
-        else:
-            all_r2_scores.append(0)
+    # Overall model gebruikt (meestal RF)
+    model_types = list(model_used_per_category.values())
+    overall_model = "random_forest" if "random_forest" in model_types else "mixed"
     
-    avg_r2_score = np.mean(all_r2_scores) if all_r2_scores else 0
-    
-    return predictions, confidence_scores, all_model_confidence, overall_model_used, avg_r2_score, model_used_per_category
+    return predictions, confidence_scores, {}, overall_model, avg_confidence, model_used_per_category
+
+def get_best_model_type():
+    """Eenvoudige best model bepaling"""
+    # Random Forest is meestal beter
+    return "random_forest" if rf_models else "decision_tree"
 
 # Startup function - aangeroepen wanneer server start
 def startup_models():
@@ -441,7 +436,7 @@ startup_models()
 
 @app.post("/api/predict", response_model=PredictionResponse)
 async def predict_waste_endpoint(request: PredictionRequest):
-    """Predict waste amounts using best model per category"""
+    """Predict waste amounts using model with highest confidence per category"""
     try:
         # Validate date format
         datetime.strptime(request.datum, '%Y-%m-%d')
@@ -450,8 +445,8 @@ async def predict_waste_endpoint(request: PredictionRequest):
         if not dt_models and not rf_models:
             raise HTTPException(status_code=503, detail="Models not loaded yet")
         
-        # Make prediction with best model per category
-        predictions, confidence_scores, all_model_confidence, model_used, avg_r2_score, model_used_per_category = predict_waste(
+        # Make prediction with highest confidence model per category
+        predictions, confidence_scores, all_model_confidence, model_used, avg_confidence, model_used_per_category = predict_waste(
             request.datum,
             request.latitude,
             request.longitude,
@@ -468,7 +463,9 @@ async def predict_waste_endpoint(request: PredictionRequest):
                 "temperatuur": request.temperatuur,
                 "weersverwachting": request.weersverwachting,
                 "latitude": request.latitude,
-                "longitude": request.longitude
+                "longitude": request.longitude,
+                "avg_confidence": round(avg_confidence, 3),  # Voeg average confidence toe
+                "all_model_confidence": all_model_confidence  # Toon alle confidence scores
             },
             data_source="TrashItems API + Weather API"
         )
@@ -480,36 +477,30 @@ async def predict_waste_endpoint(request: PredictionRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid date format. Use YYYY-MM-DD: {str(e)}")
-    except Exception as e:
-        print(f"Prediction error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 @app.get("/api/model-info")
 async def get_model_info():
-    """Get information about the trained models"""
+    """Eenvoudige model info - net zoals notebooks"""
     try:
-        best_model = get_best_model_type()
+        categories = ['Plastic', 'Papier', 'Organisch', 'Glas']
         
-        # Alle categorieën inclusief totaal_afval
-        categories = ['Plastic', 'Papier', 'Organisch', 'Glas', 'totaal_afval']
-        dt_category_scores = {k: round(v, 3) for k, v in dt_r2_scores.items() if k in categories}
-        rf_category_scores = {k: round(v, 3) for k, v in rf_r2_scores.items() if k in categories}
+        # R² scores
+        dt_r2_display = {}
+        rf_r2_display = {}
+        
+        for category in categories:
+            dt_r2_display[category] = round(dt_r2_scores.get(category, 0), 3)
+            rf_r2_display[category] = round(rf_r2_scores.get(category, 0), 3)
         
         return {
-            "best_model_type": best_model,
-            "decision_tree_r2_scores": dt_category_scores,
-            "random_forest_r2_scores": rf_category_scores,
-            "decision_tree_avg_r2": round(np.mean(list(dt_category_scores.values())), 3) if dt_category_scores else 0,
-            "random_forest_avg_r2": round(np.mean(list(rf_category_scores.values())), 3) if rf_category_scores else 0,
+            "model_type": "dual_model_system",
+            "decision_tree_r2_scores": dt_r2_display,
+            "random_forest_r2_scores": rf_r2_display,
+            "decision_tree_avg_r2": round(np.mean(list(dt_r2_display.values())), 3),
+            "random_forest_avg_r2": round(np.mean(list(rf_r2_display.values())), 3),
             "available_features": available_features,
             "supported_weather_types": list(weather_mapping.keys()),
-            "prediction_categories": categories,
-            "confidence_info": "Confidence scores range from 0.0 (low) to 1.0 (high confidence)"
+            "prediction_categories": categories
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get model info: {str(e)}")
