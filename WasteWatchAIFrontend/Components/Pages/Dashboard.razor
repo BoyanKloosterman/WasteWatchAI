@@ -1,4 +1,5 @@
 ﻿@page "/dashboard"
+@using WasteWatchAIFrontend.Models
 @rendermode InteractiveServer
 
 <PageTitle>Dashboard</PageTitle>
@@ -18,8 +19,8 @@
             <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
                 <div class="card-body">
                     <h5 class="card-title">Totaal afval</h5>
-                    <p class="card-text display-6 fw-bold">3.200 kg</p>
-                    <p class="text-muted small mb-0">Gedetecteerd deze maand</p>
+                    <p class="card-text display-6 fw-bold">@trashItems.Count</p>
+                    <p class="text-muted small mb-0">Gedetecteerd in totaal</p>
                 </div>
             </div>
         </div>
@@ -27,9 +28,9 @@
         <div class="col-sm-6 col-lg-3 mb-3">
             <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
                 <div class="card-body">
-                    <h5 class="card-title">Actieve waarschuwingen</h5>
-                    <p class="card-text display-6 fw-bold">2 gebieden</p>
-                    <p class="text-muted small mb-0">Hoge afvalniveaus</p>
+                    <h5 class="card-title">Afgelopen 30d afval</h5>
+                    <p class="card-text display-6 fw-bold">@trashItemsLast30Days.Count</p>
+                    <p class="text-muted small mb-0">Gedetecteerd afgelopen 30d</p>
                 </div>
             </div>
         </div>
@@ -187,3 +188,37 @@
         border-bottom: 1px solid #dee2e6;
     }
 </style>
+
+@code {
+    [Inject] private IHttpClientFactory HttpClientFactory { get; set; } = default!;
+
+    private List<TrashItem> trashItems = new();
+    private List<TrashItem> trashItemsLast30Days = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDummyTrashData();
+    }
+
+    private async Task LoadDummyTrashData()
+    {
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
+            var response = await httpClient.GetAsync("api/trashitems/dummy");
+            if (response.IsSuccessStatusCode)
+            {
+                trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
+
+                var dertigDagenGeleden = DateTime.UtcNow.AddDays(-30);
+                trashItemsLast30Days = trashItems
+                    .Where(item => item.Timestamp >= dertigDagenGeleden)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading trash data: {ex.Message}");
+        }
+    }
+}
