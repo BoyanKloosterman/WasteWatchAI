@@ -32,6 +32,8 @@ namespace WasteWatchAIFrontend.Components.Pages
         private bool chartsNeedUpdate = false;
         private bool isDataModeChanging = false;
         private List<string> availableLocations = new();
+        private int currentDisplayCount = 0; 
+        private string selectedFrequencyDay = string.Empty; 
         private readonly Dictionary<string, string> wasteTypeColors = new()
         {
             { "Plastic", "#e74c3c" },      // Red
@@ -39,8 +41,6 @@ namespace WasteWatchAIFrontend.Components.Pages
             { "Organisch", "#2ecc71" },    // Green
             { "Glas", "#f39c12" },         // Orange
         };
-
-        private int currentDisplayCount = 0; // Add this property to track current display count
 
         protected override async Task OnInitializedAsync()
         {
@@ -78,7 +78,7 @@ namespace WasteWatchAIFrontend.Components.Pages
             finally
             {
                 isLoading = false;
-                UpdateAvailableLocations(); // Update available locations
+                UpdateAvailableLocations();
                 await ProcessData();
                 chartsNeedUpdate = true;
                 StateHasChanged();
@@ -106,7 +106,7 @@ namespace WasteWatchAIFrontend.Components.Pages
             finally
             {
                 isLoading = false;
-                UpdateAvailableLocations(); // Update available locations
+                UpdateAvailableLocations(); 
                 await ProcessData();
                 StateHasChanged();
                 chartsNeedUpdate = true;
@@ -116,7 +116,7 @@ namespace WasteWatchAIFrontend.Components.Pages
         private async Task ToggleDataMode()
         {
             isLoading = true;
-            isDataModeChanging = true; // Set flag before changing mode
+            isDataModeChanging = true; 
             StateHasChanged();
 
             // Reset filters when switching data mode
@@ -231,13 +231,40 @@ namespace WasteWatchAIFrontend.Components.Pages
 
             locationChartData = locationGroups;
 
-            // Process frequency data - count by hour of day
-            var hourlyFrequency = new List<FrequencyDataItem>();
+            // Process frequency data - filter by selected day if specified
+            await ProcessFrequencyData();
+        }
+        
+        // Add new method for processing frequency data
+        private async Task ProcessFrequencyData()
+        {
+            var itemsToAnalyze = HasActiveFilters() ? filteredTrashItems : trashItems;
+            
+            // Filter by selected day if specified
+            if (!string.IsNullOrEmpty(selectedFrequencyDay))
+            {
+                if (selectedFrequencyDay == "today")
+                {
+                    itemsToAnalyze = itemsToAnalyze.Where(item => item.Timestamp.Date == DateTime.Today).ToList();
+                }
+                else if (selectedFrequencyDay == "yesterday")
+                {
+                    itemsToAnalyze = itemsToAnalyze.Where(item => item.Timestamp.Date == DateTime.Today.AddDays(-1)).ToList();
+                }
+                else if (selectedFrequencyDay.StartsWith("day_"))
+                {
+                    // For specific days back (day_1, day_2, etc.)
+                    var daysBack = int.Parse(selectedFrequencyDay.Replace("day_", ""));
+                    var targetDate = DateTime.Today.AddDays(-daysBack);
+                    itemsToAnalyze = itemsToAnalyze.Where(item => item.Timestamp.Date == targetDate).ToList();
+                }
+            }
 
             // Create hourly buckets from 06:00 to 22:00
+            var hourlyFrequency = new List<FrequencyDataItem>();
             for (int hour = 6; hour <= 22; hour++)
             {
-                var count = trashItems.Count(item => item.Timestamp.Hour == hour);
+                var count = itemsToAnalyze.Count(item => item.Timestamp.Hour == hour);
                 hourlyFrequency.Add(new FrequencyDataItem
                 {
                     Label = $"{hour:D2}:00",
@@ -248,6 +275,14 @@ namespace WasteWatchAIFrontend.Components.Pages
 
             frequencyData = hourlyFrequency;
         }
+        
+        private async Task OnFrequencyFilterChanged()
+        {
+            await ProcessFrequencyData();
+            StateHasChanged();
+            await InitializeFrequencyChart();
+        }
+        
         private void UpdateAvailableLocations()
         {
             // Always use the original unfiltered trashItems for available locations
@@ -319,8 +354,6 @@ namespace WasteWatchAIFrontend.Components.Pages
 
         private string GetImprovedLocationFallback(float latitude, float longitude)
         {
-            // More precise Breda locations using exact coordinates
-
             // Chasséveld Breda (51.58894, 4.78522)
             if (latitude >= 51.588 && latitude <= 51.590 && longitude >= 4.784 && longitude <= 4.786)
                 return "Chasséveld, Breda";
@@ -549,8 +582,9 @@ namespace WasteWatchAIFrontend.Components.Pages
             selectedPeriod = string.Empty;
             selectedLocation = string.Empty;
             selectedCategory = string.Empty;
+            selectedFrequencyDay = string.Empty; // Add this line
         }
-
+        
         private bool HasActiveFilters()
         {
             return !string.IsNullOrEmpty(selectedPeriod) ||
@@ -931,7 +965,7 @@ namespace WasteWatchAIFrontend.Components.Pages
                     var existingCamera = cameraLocationCache.FirstOrDefault(kvp => kvp.Key == locationKey);
                     if (!existingCamera.Equals(default(KeyValuePair<string, string>)))
                     {
-                        var cameraNumber = existingCamera.Value.Split(' ')[1]; // Extract camera number
+                        var cameraNumber = existingCamera.Value.Split(' ')[1]; 
                         cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
                     }
 
@@ -946,6 +980,24 @@ namespace WasteWatchAIFrontend.Components.Pages
 
             // Trigger UI update after all locations are loaded
             StateHasChanged();
+        }
+        private string GetFrequencyFilterSummary()
+        {
+            if (string.IsNullOrEmpty(selectedFrequencyDay))
+                return "alle dagen";
+                
+            return selectedFrequencyDay switch
+            {
+                "today" => "vandaag",
+                "yesterday" => "gisteren", 
+                "day_2" => "2 dagen geleden",
+                "day_3" => "3 dagen geleden",
+                "day_4" => "4 dagen geleden",
+                "day_5" => "5 dagen geleden",
+                "day_6" => "6 dagen geleden",
+                "day_7" => "7 dagen geleden",
+                _ => selectedFrequencyDay
+            };
         }
     }
 }
