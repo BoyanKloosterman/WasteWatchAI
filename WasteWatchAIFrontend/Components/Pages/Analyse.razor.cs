@@ -19,6 +19,7 @@ namespace WasteWatchAIFrontend.Components.Pages
         private List<LocationChartData> locationChartData = new();
         private List<FrequencyDataItem> frequencyData = new();
         private readonly Dictionary<string, string> cameraLocationCache = new();
+        private readonly Dictionary<string, string> locationCache = new();
         private bool isLoading = true;
         private string selectedPeriod = string.Empty;
         private string selectedLocation = string.Empty;
@@ -238,7 +239,8 @@ namespace WasteWatchAIFrontend.Components.Pages
         if (!cameraLocationCache.ContainsKey(locationKey))
         {
             var cameraNumber = cameraLocationCache.Count + 1;
-            cameraLocationCache[locationKey] = $"Camera {cameraNumber}";
+            var generalLocation = GetGeneralLocationFallback(latitude, longitude);
+            cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {generalLocation}";
         }
         
         return cameraLocationCache[locationKey];
@@ -704,5 +706,59 @@ namespace WasteWatchAIFrontend.Components.Pages
                 Console.WriteLine($"Error initializing correlation charts: {ex.Message}");
             }
         }
+
+private async Task<string> GetGeneralLocationAsync(float latitude, float longitude)
+{
+    var locationKey = $"{Math.Round(latitude, 3)},{Math.Round(longitude, 3)}";
+    
+    // Check cache first
+    if (locationCache.ContainsKey(locationKey))
+        return locationCache[locationKey];
+
+    try
+    {
+        using var httpClient = HttpClientFactory.CreateClient();
+        httpClient.DefaultRequestHeaders.Add("User-Agent", "WasteWatchAI/1.0");
+        
+        var url = $"https://nominatim.openstreetmap.org/reverse?format=json&lat={latitude}&lon={longitude}&addressdetails=1&extratags=1";
+        
+        var response = await httpClient.GetStringAsync(url);
+        var data = JsonSerializer.Deserialize<JsonElement>(response);
+        
+        var address = data.GetProperty("address");
+        
+        // Try to get city/town/village
+        string location = "Onbekende locatie";
+        if (address.TryGetProperty("city", out var city))
+            location = city.GetString() ?? location;
+        else if (address.TryGetProperty("town", out var town))
+            location = town.GetString() ?? location;
+        else if (address.TryGetProperty("village", out var village))
+            location = village.GetString() ?? location;
+        else if (address.TryGetProperty("municipality", out var municipality))
+            location = municipality.GetString() ?? location;
+        
+        locationCache[locationKey] = location;
+        return location;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting location: {ex.Message}");
+        return $"Locatie ({Math.Round(latitude, 2)}, {Math.Round(longitude, 2)})";
+    }
+}
+
+private string GetGeneralLocationFallback(float latitude, float longitude)
+{
+    // Simple fallback based on major Dutch cities
+    if (latitude >= 51.55 && latitude <= 51.62 && longitude >= 4.73 && longitude <= 4.82)
+        return "Breda";
+    if (latitude >= 52.30 && latitude <= 52.42 && longitude >= 4.70 && longitude <= 5.00)
+        return "Amsterdam";
+    if (latitude >= 51.85 && latitude <= 51.96 && longitude >= 4.35 && longitude <= 4.60)
+        return "Rotterdam";
+    
+    return $"Nederland ({Math.Round(latitude, 2)}, {Math.Round(longitude, 2)})";
+}
     }
 }
