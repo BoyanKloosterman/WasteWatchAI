@@ -15,6 +15,20 @@
         <h1>
             Reports
         </h1>
+        <div> 
+            <button class="btn btn-success btn-lg" @onclick="ExportData" disabled="@isExporting">
+                @if (isExporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Generating PDF...</span>
+                }
+                else
+                {
+                    <i class="fas fa-file-pdf me-2"></i>
+                    <span>Export</span>
+                }
+            </button>
+        </div>
     </div>
 
     <div class="row mb-4">
@@ -25,11 +39,11 @@
                     <p class="card-text display-6 fw-bold">@averageChange.ToString("0.##")%</p>
                     @if (averageChange > 0)
                     {
-                        <p class="text-success fw-bold">Increase 📈</p>
+                        <p class="text-danger fw-bold">Increase</p>
                     }
                     else if (averageChange < 0)
                     {
-                        <p class="text-danger fw-bold">Reduction 📉</p>
+                        <p class="text-success fw-bold">Reduction</p>
                     }
                     else
                     {
@@ -84,15 +98,15 @@
                     <ul class="nav nav-tabs mb-3" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @(benchmarkTab == "month" ? "active" : "")"
-                                    @onclick='() => SetBenchmarkTab("month")'
-                                    type="button">
+                            @onclick='() => SetBenchmarkTab("month")'
+                            type="button">
                                 Maand
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @(benchmarkTab == "week" ? "active" : "")"
-                                    @onclick='() => SetBenchmarkTab("week")'
-                                    type="button">
+                            @onclick='() => SetBenchmarkTab("week")'
+                            type="button">
                                 Week
                             </button>
                         </li>
@@ -348,6 +362,7 @@
     private double averageChange;
     private string activeTab = "week";
     private string benchmarkTab = "month";
+    private bool isExporting = false;
 
     public class WeeklyTrashData
     {
@@ -364,6 +379,13 @@
             CalculateMonthlyTrashData();
             CalculateMonthlyTypeBenchmark();
             CalculateWeeklyTypeBenchmark();
+
+            var pdfLibrariesLoaded = await CheckPDFLibrariesAsync();
+            if (!pdfLibrariesLoaded)
+            {
+                Console.WriteLine("⚠️ Warning: PDF libraries not loaded. Export may not work.");
+            }
+
 
             if (activeTab == "week")
             {
@@ -383,6 +405,7 @@
         CalculateMonthlyTrashData();
         CalculateMonthlyTypeBenchmark();
         CalculateWeeklyTypeBenchmark();
+        
     }
 
     private void SetActiveTab(string tab)
@@ -399,6 +422,12 @@
             _ = JS.InvokeVoidAsync("drawTrashChartMonthly", proportionChangePerMonth);
         }
     }
+
+	private void SetIsExporting(bool exporting)
+	{
+		isExporting = exporting;
+		StateHasChanged();
+	}
 
     private void SetBenchmarkTab(string tab)
     {
@@ -539,6 +568,112 @@
 
             trashTypeCountPerWeek[weekKey] = typeCounts;
             totalTrashPerWeek[weekKey] = group.Count();
+        }
+    }
+
+
+    private async Task ExportData()
+    {
+        isExporting = true;
+        StateHasChanged();
+
+        try
+        {
+            var exportData = new
+            {
+                GeneratedDate = DateTime.Now,
+                AverageWeeklyChange = averageChange,
+
+                WeeklyData = trashPerWeek
+                    .OrderBy(kvp => kvp.Key)
+                    .TakeLast(10)
+                    .Select(kvp => new
+                    {
+                        Week = kvp.Key,
+                        Count = kvp.Value,
+                        ProportionChange = proportionChangePerWeek.TryGetValue(kvp.Key, out var change) ? change : 0
+                    }).ToList(),
+
+                MonthlyData = trashPerMonth
+                    .OrderBy(kvp => kvp.Key)
+                    .TakeLast(12)
+                    .Select(kvp => new
+                    {
+                        MonthCode = kvp.Key,
+                        MonthName = new DateTime(kvp.Key / 100, kvp.Key % 100, 1).ToString("MMMM yyyy", CultureInfo.GetCultureInfo("nl-NL")),
+                        Count = kvp.Value,
+                        ProportionChange = proportionChangePerMonth.TryGetValue(kvp.Key, out var change) ? change : 0
+                    }).ToList(),
+
+                WeeklyBenchmark = trashTypeCountPerWeek
+                    .OrderBy(kvp => kvp.Key)
+                    .TakeLast(8)
+                    .Select(kvp => new
+                    {
+                        Week = kvp.Key,
+                        Plastic = kvp.Value.TryGetValue("Plastic", out var p) ? p : 0,
+                        Papier = kvp.Value.TryGetValue("Papier", out var pa) ? pa : 0,
+                        Glas = kvp.Value.TryGetValue("Glas", out var g) ? g : 0,
+                        Organisch = kvp.Value.TryGetValue("Organisch", out var o) ? o : 0,
+                        Total = totalTrashPerWeek.TryGetValue(kvp.Key, out var total) ? total : 0
+                    }).ToList(),
+
+                MonthlyBenchmark = trashTypeCountPerMonth
+                    .OrderBy(kvp => kvp.Key)
+                    .TakeLast(6) 
+                    .Select(kvp => new
+                    {
+                        MonthCode = kvp.Key,
+                        MonthName = new DateTime(kvp.Key / 100, kvp.Key % 100, 1).ToString("MMMM yyyy", CultureInfo.GetCultureInfo("nl-NL")),
+                        Plastic = kvp.Value.TryGetValue("Plastic", out var p) ? p : 0,
+                        Papier = kvp.Value.TryGetValue("Papier", out var pa) ? pa : 0,
+                        Glas = kvp.Value.TryGetValue("Glas", out var g) ? g : 0,
+                        Organisch = kvp.Value.TryGetValue("Organisch", out var o) ? o : 0,
+                        Total = totalTrashPerMonth.TryGetValue(kvp.Key, out var total) ? total : 0
+                    }).ToList()
+            };
+
+            Console.WriteLine("Starting PDF export...");
+
+            var success = await JS.InvokeAsync<bool>("exportAdvancedPDF", exportData);
+
+            if (success)
+            {
+                Console.WriteLine("✅ PDF export completed successfully!");
+            }
+            else
+            {
+                Console.WriteLine("❌ PDF export failed. Check browser console for details.");
+            }
+        }
+        catch (JSException jsEx)
+        {
+            Console.WriteLine($"❌ JavaScript error during PDF export: {jsEx.Message}");
+            Console.WriteLine($"Stack trace: {jsEx.StackTrace}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error preparing data for PDF export: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+        finally
+        {
+            isExporting = false;
+            StateHasChanged();
+        }
+    }
+
+
+    private async Task<bool> CheckPDFLibrariesAsync()
+    {
+        try
+        {
+            var isLoaded = await JS.InvokeAsync<bool>("eval", "typeof window.jspdf !== 'undefined' && typeof window.jspdf.jsPDF !== 'undefined'");
+            return isLoaded;
+        }
+        catch
+        {
+            return false;
         }
     }
 }

@@ -438,3 +438,266 @@ window.drawTrashChartMonthly = (data) => {
     });
 }
 
+window.exportAdvancedPDF = function (reportData) {
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const primaryColor = [0, 102, 204];
+        const successColor = [25, 135, 84];
+        const dangerColor = [220, 53, 69];
+        const lightBlue = [240, 248, 255];
+        const darkGray = [52, 58, 64];
+
+        doc.setFillColor(...primaryColor);
+        doc.rect(0, 0, 210, 30, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(24);
+        doc.setFont(undefined, 'bold');
+        doc.text('WasteWatch AI', 20, 20);
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'normal');
+        doc.text('Intelligent Waste Monitoring Report', 20, 26);
+        doc.setTextColor(0, 0, 0);
+
+        doc.setFontSize(10);
+        doc.text(`Generated: ${new Date(reportData.generatedDate).toLocaleDateString('nl-NL', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        })}`, 20, 40);
+
+        doc.setDrawColor(...primaryColor);
+        doc.setFillColor(...lightBlue);
+        doc.roundedRect(20, 50, 170, 35, 3, 3, 'FD');
+
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(...darkGray);
+        doc.text('Samenvatting', 25, 62);
+
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'normal');
+        doc.text('Gemiddelde verandering per week:', 25, 72);
+
+        doc.setFontSize(18);
+        doc.setFont(undefined, 'bold');
+        const changeColor = reportData.averageWeeklyChange >= 0 ? dangerColor : successColor;
+        doc.setTextColor(...changeColor);
+        doc.text(`${Math.abs(reportData.averageWeeklyChange).toFixed(2)}%`, 25, 80);
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        const trendText = reportData.averageWeeklyChange >= 0 ? 'Toename in afval' : 'Afname in afval';
+        doc.text(trendText, 120, 80);
+
+        let startY = 100;
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.text('Wekelijkse Data', 20, startY);
+
+        let chartsToRender = 0;
+        let chartsRendered = 0;
+        let weekChartY = startY + 10; // Position directly under "Wekelijkse Data"
+        let weekChartRendered = false;
+
+        const checkFinalize = () => {
+            chartsRendered++;
+            if (chartsRendered === chartsToRender) finalizePDF();
+        };
+
+        const renderWeekChart = () => {
+            if (typeof Chart !== 'undefined' && !weekChartRendered) {
+                weekChartRendered = true;
+                chartsToRender++;
+                const canvasLine = document.createElement('canvas');
+                canvasLine.width = 850;
+                canvasLine.height = 425;
+                document.body.appendChild(canvasLine);
+
+                const weekLabels = reportData.weeklyData.slice(-10).map(item => `Week ${item.week}`);
+                const weekValues = reportData.weeklyData.slice(-10).map(item => item.proportionChange);
+
+                new Chart(canvasLine.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: weekLabels,
+                        datasets: [{
+                            label: 'Verandering %',
+                            data: weekValues,
+                            backgroundColor: 'rgba(0, 123, 255, 0.3)',
+                            borderColor: 'rgba(0, 123, 255, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        animation: {
+                            onComplete: () => {
+                                const img = canvasLine.toDataURL('image/png');
+                                doc.addImage(img, 'PNG', 20, weekChartY, 170, 85);
+                                setTimeout(() => document.body.removeChild(canvasLine), 0);
+                                renderMonthlySection();
+                                checkFinalize();
+                            }
+                        },
+                        responsive: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { callback: v => `${v}%` } }
+                        }
+                    }
+                });
+            } else {
+                doc.setFontSize(12);
+                doc.text('Grafiekbibliotheek niet beschikbaar - tabel wordt weergegeven', 20, weekChartY);
+                renderMonthlySection();
+            }
+        };
+
+        const renderMonthlySection = () => {
+            // Monthly benchmark starts after the week chart
+            const monthlyStartY = weekChartY + 100;
+
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'bold');
+            doc.text('Maandelijkse Benchmark', 20, monthlyStartY);
+
+            const monthlyTableData = reportData.monthlyBenchmark.slice(-6).map(item => {
+                const total = item.total;
+                return [
+                    item.monthName,
+                    `${item.plastic} (${((item.plastic / total) * 100).toFixed(1)}%)`,
+                    `${item.papier} (${((item.papier / total) * 100).toFixed(1)}%)`,
+                    `${item.glas} (${((item.glas / total) * 100).toFixed(1)}%)`,
+                    `${item.organisch} (${((item.organisch / total) * 100).toFixed(1)}%)`,
+                    total.toString()
+                ];
+            });
+
+            doc.autoTable({
+                startY: monthlyStartY + 10,
+                head: [['Maand', 'Plastic', 'Papier', 'Glas', 'Organisch', 'Totaal']],
+                body: monthlyTableData,
+                theme: 'striped',
+                headStyles: {
+                    fillColor: [40, 167, 69],
+                    textColor: [255, 255, 255],
+                    fontSize: 10,
+                    fontStyle: 'bold'
+                },
+                styles: {
+                    fontSize: 9,
+                    cellPadding: 3
+                },
+                alternateRowStyles: {
+                    fillColor: [248, 249, 250]
+                },
+                margin: { left: 20, right: 20 },
+                columnStyles: {
+                    0: { cellWidth: 35 },
+                    1: { halign: 'center', cellWidth: 28 },
+                    2: { halign: 'center', cellWidth: 28 },
+                    3: { halign: 'center', cellWidth: 28 },
+                    4: { halign: 'center', cellWidth: 28 },
+                    5: { halign: 'center', cellWidth: 25, fontStyle: 'bold' }
+                }
+            });
+
+            renderPieChart();
+        };
+
+        const renderPieChart = () => {
+            // Pie chart starts after the monthly table
+            let pieStartY = doc.lastAutoTable?.finalY > 220 ? (doc.addPage(), 30) : (doc.lastAutoTable?.finalY ?? 280) + 25;
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'bold');
+            doc.text('Verhouding Afvalsoorten', 20, pieStartY);
+
+            if (typeof Chart !== 'undefined') {
+                chartsToRender++;
+                const canvasPie = document.createElement('canvas');
+                canvasPie.width = 400;
+                canvasPie.height = 400;
+                document.body.appendChild(canvasPie);
+
+                const totalPlastic = reportData.monthlyBenchmark.reduce((sum, item) => sum + item.plastic, 0);
+                const totalPaper = reportData.monthlyBenchmark.reduce((sum, item) => sum + item.papier, 0);
+                const totalGlass = reportData.monthlyBenchmark.reduce((sum, item) => sum + item.glas, 0);
+                const totalOrganic = reportData.monthlyBenchmark.reduce((sum, item) => sum + item.organisch, 0);
+
+                new Chart(canvasPie.getContext('2d'), {
+                    type: 'pie',
+                    data: {
+                        labels: ['Plastic', 'Papier', 'Glas', 'Organisch'],
+                        datasets: [{
+                            data: [totalPlastic, totalPaper, totalGlass, totalOrganic],
+                            backgroundColor: ['#0d6efd', '#ffc107', '#20c997', '#fd7e14']
+                        }]
+                    },
+                    options: {
+                        animation: {
+                            onComplete: () => {
+                                const img = canvasPie.toDataURL('image/png');
+                                doc.addImage(img, 'PNG', 20, pieStartY + 10, 150, 150);
+                                setTimeout(() => document.body.removeChild(canvasPie), 0);
+                                checkFinalize();
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    font: {
+                                        size: 60
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                const totalPlastic = reportData.monthlyBenchmark.reduce((sum, item) => sum + item.plastic, 0);
+                const totalPaper = reportData.monthlyBenchmark.reduce((sum, item) => sum + item.papier, 0);
+                const totalGlass = reportData.monthlyBenchmark.reduce((sum, item) => sum + item.glas, 0);
+                const totalOrganic = reportData.monthlyBenchmark.reduce((sum, item) => sum + item.organisch, 0);
+                const grandTotal = totalPlastic + totalPaper + totalGlass + totalOrganic;
+
+                doc.setFontSize(12);
+                doc.text(`Plastic: ${totalPlastic} (${((totalPlastic / grandTotal) * 100).toFixed(1)}%)`, 20, pieStartY + 20);
+                doc.text(`Papier: ${totalPaper} (${((totalPaper / grandTotal) * 100).toFixed(1)}%)`, 20, pieStartY + 35);
+                doc.text(`Glas: ${totalGlass} (${((totalGlass / grandTotal) * 100).toFixed(1)}%)`, 20, pieStartY + 50);
+                doc.text(`Organisch: ${totalOrganic} (${((totalOrganic / grandTotal) * 100).toFixed(1)}%)`, 20, pieStartY + 65);
+
+                if (typeof Chart === 'undefined') finalizePDF();
+            }
+        };
+
+        // Start the rendering process
+        renderWeekChart();
+
+        function finalizePDF() {
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setDrawColor(200, 200, 200);
+                doc.line(20, 285, 190, 285);
+                doc.setFontSize(8);
+                doc.setTextColor(100, 100, 100);
+                doc.text('WasteWatch AI - Intelligent Waste Monitoring System', 20, 290);
+                doc.text(`Pagina ${i} van ${pageCount}`, 170, 290);
+                doc.text(`Gegenereerd: ${new Date().toLocaleString('nl-NL')}`, 20, 294);
+            }
+
+            const fileName = `WasteWatch-Report-${new Date().toISOString().split('T')[0]}.pdf`;
+            doc.save(fileName);
+            console.log('Advanced PDF export completed:', fileName);
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error creating advanced PDF:', error);
+        return false;
+    }
+};
