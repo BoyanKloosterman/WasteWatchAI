@@ -1,7 +1,6 @@
 ﻿@page "/analyse"
 @rendermode InteractiveServer
 
-
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="pt-3">
@@ -57,7 +56,7 @@
                         <label for="locatie" class="form-label">Locatie</label>
                         <select class="form-select" id="locatie" @bind="selectedLocation" @bind:after="OnFilterChanged">
                             <option value="">Kies locatie</option>
-                            @foreach (var location in locationChartData.Select(l => l.LocationName).Distinct())
+                            @foreach (var location in availableLocations)
                             {
                                 <option value="@location">@location</option>
                             }

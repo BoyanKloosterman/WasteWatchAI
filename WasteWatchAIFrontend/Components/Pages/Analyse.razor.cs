@@ -30,9 +30,8 @@ namespace WasteWatchAIFrontend.Components.Pages
         private string correlationError = string.Empty;
         private bool useDummyData = false;
         private bool chartsNeedUpdate = false;
-
-
-        // Define color mapping for waste types
+        private bool isDataModeChanging = false;
+        private List<string> availableLocations = new();
         private readonly Dictionary<string, string> wasteTypeColors = new()
         {
             { "Plastic", "#e74c3c" },      // Red
@@ -76,6 +75,7 @@ namespace WasteWatchAIFrontend.Components.Pages
             finally
             {
                 isLoading = false;
+                UpdateAvailableLocations(); // Update available locations
                 await ProcessData();
                 chartsNeedUpdate = true;
                 StateHasChanged();
@@ -103,6 +103,7 @@ namespace WasteWatchAIFrontend.Components.Pages
             finally
             {
                 isLoading = false;
+                UpdateAvailableLocations(); // Update available locations
                 await ProcessData();
                 StateHasChanged();
                 chartsNeedUpdate = true;
@@ -112,7 +113,15 @@ namespace WasteWatchAIFrontend.Components.Pages
         private async Task ToggleDataMode()
         {
             isLoading = true;
+            isDataModeChanging = true; // Set flag before changing mode
             StateHasChanged();
+
+            // Reset filters when switching data mode
+            ResetFiltersWithoutProcessing();
+
+            // Clear location caches when switching modes
+            cameraLocationCache.Clear();
+            locationCache.Clear();
 
             if (useDummyData)
                 await LoadDummyTrashData();
@@ -120,6 +129,8 @@ namespace WasteWatchAIFrontend.Components.Pages
                 await LoadRealTrashData();
 
             await LoadCorrelationData();
+            
+            isDataModeChanging = false; // Reset flag after mode change is complete
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -233,6 +244,15 @@ namespace WasteWatchAIFrontend.Components.Pages
             }
 
             frequencyData = hourlyFrequency;
+        }
+        private void UpdateAvailableLocations()
+        {
+            // Always use the original unfiltered trashItems for available locations
+            availableLocations = trashItems
+                .Select(item => GetLocationName(item.Latitude, item.Longitude))
+                .Distinct()
+                .OrderBy(loc => loc)
+                .ToList();
         }
 
       private string GetLocationName(float latitude, float longitude)
@@ -468,42 +488,43 @@ private string GetImprovedLocationFallback(float latitude, float longitude)
                 GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase));
         }
 
-        // Store filtered items for correlation analysis
         filteredTrashItems = filteredItems.ToList();
         
-        // Update trash items temporarily for processing
         var originalItems = trashItems;
         trashItems = filteredTrashItems;
 
         await ProcessData();
-        
-        // Reload correlation data with filtered items
         await LoadCorrelationData();
-        
-        // Restore original items
         trashItems = originalItems;
 
         StateHasChanged();
         await InitializeCharts();
     }
 
-        // New method for handling filter changes
         private async Task OnFilterChanged()
         {
+            // Only check if selected location exists when changing data modes
+            if (isDataModeChanging && !string.IsNullOrEmpty(selectedLocation) && !availableLocations.Contains(selectedLocation))
+            {
+                selectedLocation = string.Empty;
+            }
+
             await ApplyFilters();
         }
 
-        // New method for resetting filters
         private async Task ResetFilters()
+        {
+            ResetFiltersWithoutProcessing();
+            await ApplyFilters();
+        }
+
+        private void ResetFiltersWithoutProcessing()
         {
             selectedPeriod = string.Empty;
             selectedLocation = string.Empty;
             selectedCategory = string.Empty;
-
-            await ApplyFilters();
         }
 
-        // Helper method to check if any filters are active
         private bool HasActiveFilters()
         {
             return !string.IsNullOrEmpty(selectedPeriod) ||
@@ -551,7 +572,6 @@ private string GetImprovedLocationFallback(float latitude, float longitude)
 
             Console.WriteLine($"Sending {trashItemsToSend.Count} trash items to API (filtered: {HasActiveFilters()})");
 
-            // Adjust days_back based on period filter
             var daysBack = selectedPeriod switch
             {
                 "week" => 7,
