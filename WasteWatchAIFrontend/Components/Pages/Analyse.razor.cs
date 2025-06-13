@@ -40,6 +40,8 @@ namespace WasteWatchAIFrontend.Components.Pages
             { "Glas", "#f39c12" },         // Orange
         };
 
+        private int currentDisplayCount = 0; // Add this property to track current display count
+
         protected override async Task OnInitializedAsync()
         {
             if (useDummyData)
@@ -53,6 +55,7 @@ namespace WasteWatchAIFrontend.Components.Pages
                 await PreloadLocationNames();
             }
 
+            currentDisplayCount = trashItems.Count; // Initialize display count
             await ProcessData();
             await LoadCorrelationData();
         }
@@ -129,7 +132,7 @@ namespace WasteWatchAIFrontend.Components.Pages
                 await LoadRealTrashData();
 
             await LoadCorrelationData();
-            
+
             isDataModeChanging = false; // Reset flag after mode change is complete
         }
 
@@ -255,110 +258,110 @@ namespace WasteWatchAIFrontend.Components.Pages
                 .ToList();
         }
 
-      private string GetLocationName(float latitude, float longitude)
-{
-    if (!useDummyData)
-    {
-        var roundedLat = Math.Round(latitude, 4);
-        var roundedLon = Math.Round(longitude, 4);
-        var locationKey = $"{roundedLat},{roundedLon}";
-        
-        if (!cameraLocationCache.ContainsKey(locationKey))
+        private string GetLocationName(float latitude, float longitude)
         {
-            var cameraNumber = cameraLocationCache.Count + 1;
-            
-            // Check if we have detailed location in cache
-            if (locationCache.ContainsKey(locationKey))
+            if (!useDummyData)
             {
-                var detailedLocation = locationCache[locationKey];
-                cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+                var roundedLat = Math.Round(latitude, 4);
+                var roundedLon = Math.Round(longitude, 4);
+                var locationKey = $"{roundedLat},{roundedLon}";
+
+                if (!cameraLocationCache.ContainsKey(locationKey))
+                {
+                    var cameraNumber = cameraLocationCache.Count + 1;
+
+                    // Check if we have detailed location in cache
+                    if (locationCache.ContainsKey(locationKey))
+                    {
+                        var detailedLocation = locationCache[locationKey];
+                        cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+                    }
+                    else
+                    {
+                        // Use improved fallback while API loads
+                        var detailedLocation = GetImprovedLocationFallback(latitude, longitude);
+                        cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+                    }
+                }
+
+                return cameraLocationCache[locationKey];
             }
-            else
-            {
-                // Use improved fallback while API loads
-                var detailedLocation = GetImprovedLocationFallback(latitude, longitude);
-                cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
-            }
+
+            // Breda: Grote Markt (updated range)
+            if (latitude >= 51.5890 && latitude <= 51.5900 && longitude >= 4.7750 && longitude <= 4.7765)
+                return "Grote Markt Breda";
+
+            // Breda: Centraal Station
+            if (latitude >= 51.5953 && latitude <= 51.5963 && longitude >= 4.7787 && longitude <= 4.7797)
+                return "Centraal Station Breda";
+
+            // Breda: Valkenberg Park
+            if (latitude >= 51.5929 && latitude <= 51.5939 && longitude >= 4.7791 && longitude <= 4.7801)
+                return "Valkenberg Park";
+
+            // Breda: Haagdijk (updated range)
+            if (latitude >= 51.5920 && latitude <= 51.5925 && longitude >= 4.7685 && longitude <= 4.7695)
+                return "Haagdijk";
+
+            // Breda: Chassé Park (new)
+            if (latitude >= 51.5860 && latitude <= 51.5866 && longitude >= 4.7848 && longitude <= 4.7856)
+                return "Chassé Park";
+
+            // Breda: Chasséveld (existing)
+            if (latitude >= 51.5890 && latitude <= 51.5902 && longitude >= 4.7750 && longitude <= 4.7766)
+                return "Chasséveld";
+
+            // Default locations for other dummy coordinates
+            var random = new Random((int)(latitude * 1000 + longitude * 1000));
+            var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
+            return locations[random.Next(locations.Length)];
         }
-        
-        return cameraLocationCache[locationKey];
-    }
 
-    // Breda: Grote Markt (updated range)
-    if (latitude >= 51.5890 && latitude <= 51.5900 && longitude >= 4.7750 && longitude <= 4.7765)
-        return "Grote Markt Breda";
+        private string GetImprovedLocationFallback(float latitude, float longitude)
+        {
+            // More precise Breda locations using exact coordinates
 
-    // Breda: Centraal Station
-    if (latitude >= 51.5953 && latitude <= 51.5963 && longitude >= 4.7787 && longitude <= 4.7797)
-        return "Centraal Station Breda";
+            // Chasséveld Breda (51.58894, 4.78522)
+            if (latitude >= 51.588 && latitude <= 51.590 && longitude >= 4.784 && longitude <= 4.786)
+                return "Chasséveld, Breda";
 
-    // Breda: Valkenberg Park
-    if (latitude >= 51.5929 && latitude <= 51.5939 && longitude >= 4.7791 && longitude <= 4.7801)
-        return "Valkenberg Park";
+            // Grote Markt Breda
+            if (latitude >= 51.588 && latitude <= 51.591 && longitude >= 4.774 && longitude <= 4.777)
+                return "Grote Markt, Centrum, Breda";
 
-    // Breda: Haagdijk (updated range)
-    if (latitude >= 51.5920 && latitude <= 51.5925 && longitude >= 4.7685 && longitude <= 4.7695)
-        return "Haagdijk";
+            // Centraal Station Breda
+            if (latitude >= 51.595 && latitude <= 51.597 && longitude >= 4.778 && longitude <= 4.780)
+                return "Stationsplein, Breda Centraal";
 
-    // Breda: Chassé Park (new)
-    if (latitude >= 51.5860 && latitude <= 51.5866 && longitude >= 4.7848 && longitude <= 4.7856)
-        return "Chassé Park";
+            // Valkenberg Park
+            if (latitude >= 51.592 && latitude <= 51.595 && longitude >= 4.778 && longitude <= 4.781)
+                return "Valkenberg Park, Breda";
 
-    // Breda: Chasséveld (existing)
-    if (latitude >= 51.5890 && latitude <= 51.5902 && longitude >= 4.7750 && longitude <= 4.7766)
-        return "Chasséveld";
+            // Haagdijk
+            if (latitude >= 51.591 && latitude <= 51.594 && longitude >= 4.767 && longitude <= 4.770)
+                return "Haagdijk, Breda";
 
-    // Default locations for other dummy coordinates
-    var random = new Random((int)(latitude * 1000 + longitude * 1000));
-    var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
-    return locations[random.Next(locations.Length)];
-}
+            // Chassé Park
+            if (latitude >= 51.585 && latitude <= 51.587 && longitude >= 4.784 && longitude <= 4.786)
+                return "Chassé Park, Breda";
 
-private string GetImprovedLocationFallback(float latitude, float longitude)
-{
-    // More precise Breda locations using exact coordinates
-    
-    // Chasséveld Breda (51.58894, 4.78522)
-    if (latitude >= 51.588 && latitude <= 51.590 && longitude >= 4.784 && longitude <= 4.786)
-        return "Chasséveld, Breda";
-    
-    // Grote Markt Breda
-    if (latitude >= 51.588 && latitude <= 51.591 && longitude >= 4.774 && longitude <= 4.777)
-        return "Grote Markt, Centrum, Breda";
-    
-    // Centraal Station Breda
-    if (latitude >= 51.595 && latitude <= 51.597 && longitude >= 4.778 && longitude <= 4.780)
-        return "Stationsplein, Breda Centraal";
-    
-    // Valkenberg Park
-    if (latitude >= 51.592 && latitude <= 51.595 && longitude >= 4.778 && longitude <= 4.781)
-        return "Valkenberg Park, Breda";
-    
-    // Haagdijk
-    if (latitude >= 51.591 && latitude <= 51.594 && longitude >= 4.767 && longitude <= 4.770)
-        return "Haagdijk, Breda";
-    
-    // Chassé Park
-    if (latitude >= 51.585 && latitude <= 51.587 && longitude >= 4.784 && longitude <= 4.786)
-        return "Chassé Park, Breda";
-    
-    // Broader Breda area
-    if (latitude >= 51.55 && latitude <= 51.62 && longitude >= 4.73 && longitude <= 4.82)
-        return "Breda";
-    
-    // Other major Dutch cities with more precise ranges
-    if (latitude >= 52.35 && latitude <= 52.38 && longitude >= 4.88 && longitude <= 4.92)
-        return "Amsterdam Centrum";
-    
-    if (latitude >= 51.91 && latitude <= 51.93 && longitude >= 4.46 && longitude <= 4.49)
-        return "Rotterdam Centrum";
-    
-    if (latitude >= 52.06 && latitude <= 52.08 && longitude >= 4.29 && longitude <= 4.32)
-        return "Den Haag Centrum";
-    
-    // Use more precise coordinates in fallback
-    return $"Nederland ({Math.Round(latitude, 3)}, {Math.Round(longitude, 3)})";
-}
+            // Broader Breda area
+            if (latitude >= 51.55 && latitude <= 51.62 && longitude >= 4.73 && longitude <= 4.82)
+                return "Breda";
+
+            // Other major Dutch cities with more precise ranges
+            if (latitude >= 52.35 && latitude <= 52.38 && longitude >= 4.88 && longitude <= 4.92)
+                return "Amsterdam Centrum";
+
+            if (latitude >= 51.91 && latitude <= 51.93 && longitude >= 4.46 && longitude <= 4.49)
+                return "Rotterdam Centrum";
+
+            if (latitude >= 52.06 && latitude <= 52.08 && longitude >= 4.29 && longitude <= 4.32)
+                return "Den Haag Centrum";
+
+            // Use more precise coordinates in fallback
+            return $"Nederland ({Math.Round(latitude, 3)}, {Math.Round(longitude, 3)})";
+        }
 
         private string GetDayAbbreviation(DayOfWeek day)
         {
@@ -391,83 +394,83 @@ private string GetImprovedLocationFallback(float latitude, float longitude)
         }
 
         private string GetFilterSummary()
-    {
-        var parts = new List<string>();
-
-        // Periode
-        if (!string.IsNullOrEmpty(selectedPeriod))
         {
-            parts.Add(selectedPeriod switch
+            var parts = new List<string>();
+
+            // Periode
+            if (!string.IsNullOrEmpty(selectedPeriod))
             {
-                "week" => "de afgelopen week",
-                "month" => "de afgelopen maand",
-                "year" => "het afgelopen jaar",
-                _ => ""
-            });
-        }
-        else
-        {
-            parts.Add("de volledige periode");
-        }
-
-        // Locatie
-        if (!string.IsNullOrEmpty(selectedLocation))
-            parts.Add($"locatie: {selectedLocation}");
-        else
-            parts.Add("alle locaties");
-
-        // Categorie
-        if (!string.IsNullOrEmpty(selectedCategory))
-        {
-            var cat = selectedCategory switch
+                parts.Add(selectedPeriod switch
+                {
+                    "week" => "de afgelopen week",
+                    "month" => "de afgelopen maand",
+                    "year" => "het afgelopen jaar",
+                    _ => ""
+                });
+            }
+            else
             {
-                "plastic" => "Plastic",
-                "papier" => "Papier",
-                "gft" => "GFT/Organisch",
-                "glas" => "Glas",
-                _ => selectedCategory
-            };
-            parts.Add($"categorie: {cat}");
-        }
-        else
-        {
-            parts.Add("alle categorieën");
-        }
+                parts.Add("de volledige periode");
+            }
 
-        // Add item count if filters are active
-        if (HasActiveFilters())
-        {
-            var itemCount = filteredTrashItems?.Count ?? 0;
-            parts.Add($"({itemCount} items)");
-        }
-        else
-        {
-            parts.Add($"({trashItems.Count} items)");
-        }
+            // Locatie
+            if (!string.IsNullOrEmpty(selectedLocation))
+                parts.Add($"locatie: {selectedLocation}");
+            else
+                parts.Add("alle locaties");
 
-        return string.Join(", ", parts);
-    }
-
-
- private async Task ApplyFilters()
-    {
-        var filteredItems = trashItems.AsEnumerable();
-
-        if (!string.IsNullOrEmpty(selectedPeriod))
-        {
-            var now = DateTime.Now;
-            filteredItems = selectedPeriod switch
+            // Categorie
+            if (!string.IsNullOrEmpty(selectedCategory))
             {
-                "week" => filteredItems.Where(item => item.Timestamp >= now.AddDays(-7)),
-                "month" => filteredItems.Where(item => item.Timestamp >= now.AddMonths(-1)),
-                "year" => filteredItems.Where(item => item.Timestamp >= now.AddYears(-1)),
-                _ => filteredItems
-            };
+                var cat = selectedCategory switch
+                {
+                    "plastic" => "Plastic",
+                    "papier" => "Papier",
+                    "gft" => "GFT/Organisch",
+                    "glas" => "Glas",
+                    _ => selectedCategory
+                };
+                parts.Add($"categorie: {cat}");
+            }
+            else
+            {
+                parts.Add("alle categorieën");
+            }
+
+            // Add item count if filters are active
+            if (HasActiveFilters())
+            {
+                var itemCount = filteredTrashItems?.Count ?? 0;
+                parts.Add($"({itemCount} items)");
+            }
+            else
+            {
+                parts.Add($"({trashItems.Count} items)");
+            }
+
+            return string.Join(", ", parts);
         }
 
-        if (!string.IsNullOrEmpty(selectedCategory))
+
+        private async Task ApplyFilters()
         {
-            var categoryMap = new Dictionary<string, string>
+            var filteredItems = trashItems.AsEnumerable();
+
+            if (!string.IsNullOrEmpty(selectedPeriod))
+            {
+                var now = DateTime.Now;
+                filteredItems = selectedPeriod switch
+                {
+                    "week" => filteredItems.Where(item => item.Timestamp >= now.AddDays(-7)),
+                    "month" => filteredItems.Where(item => item.Timestamp >= now.AddMonths(-1)),
+                    "year" => filteredItems.Where(item => item.Timestamp >= now.AddYears(-1)),
+                    _ => filteredItems
+                };
+            }
+
+            if (!string.IsNullOrEmpty(selectedCategory))
+            {
+                var categoryMap = new Dictionary<string, string>
             {
                 { "plastic", "Plastic" },
                 { "papier", "Papier" },
@@ -475,31 +478,58 @@ private string GetImprovedLocationFallback(float latitude, float longitude)
                 { "glas", "Glas" }
             };
 
-            if (categoryMap.TryGetValue(selectedCategory, out var actualCategory))
+                if (categoryMap.TryGetValue(selectedCategory, out var actualCategory))
+                {
+                    filteredItems = filteredItems.Where(item =>
+                        item.LitterType.Equals(actualCategory, StringComparison.OrdinalIgnoreCase));
+                }
+            }
+
+            if (!string.IsNullOrEmpty(selectedLocation))
             {
                 filteredItems = filteredItems.Where(item =>
-                    item.LitterType.Equals(actualCategory, StringComparison.OrdinalIgnoreCase));
+                    GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase));
             }
+
+            // Store filtered items for correlation analysis
+            filteredTrashItems = filteredItems.ToList();
+
+            // Update current display count
+            currentDisplayCount = filteredTrashItems.Count;
+
+            // Update charts with filtered items WITHOUT changing availableLocations
+            var originalItems = trashItems;
+            trashItems = filteredTrashItems;
+
+            await ProcessData();
+
+            // Reload correlation data with filtered items
+            await LoadCorrelationData();
+
+            // Restore original items
+            trashItems = originalItems;
+
+            StateHasChanged();
+            await InitializeCharts();
         }
 
-        if (!string.IsNullOrEmpty(selectedLocation))
+        // Updated method for resetting filters
+        private async Task ResetFilters()
         {
-            filteredItems = filteredItems.Where(item =>
-                GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase));
+            ResetFiltersWithoutProcessing();
+            currentDisplayCount = trashItems.Count; // Reset to total count
+            await ApplyFilters();
         }
 
-        filteredTrashItems = filteredItems.ToList();
-        
-        var originalItems = trashItems;
-        trashItems = filteredTrashItems;
-
-        await ProcessData();
-        await LoadCorrelationData();
-        trashItems = originalItems;
-
-        StateHasChanged();
-        await InitializeCharts();
-    }
+        // New helper method to get display count
+        private int GetDisplayItemCount()
+        {
+            if (HasActiveFilters())
+            {
+                return currentDisplayCount;
+            }
+            return trashItems.Count;
+        }
 
         private async Task OnFilterChanged()
         {
@@ -512,11 +542,7 @@ private string GetImprovedLocationFallback(float latitude, float longitude)
             await ApplyFilters();
         }
 
-        private async Task ResetFilters()
-        {
-            ResetFiltersWithoutProcessing();
-            await ApplyFilters();
-        }
+
 
         private void ResetFiltersWithoutProcessing()
         {
@@ -546,124 +572,124 @@ private string GetImprovedLocationFallback(float latitude, float longitude)
                 .ToList();
         }
 
-         private async Task LoadCorrelationData()
-    {
-        isLoadingCorrelation = true;
-        correlationError = string.Empty;
-
-        try
+        private async Task LoadCorrelationData()
         {
-            Console.WriteLine("Starting correlation data load...");
-            var httpClient = HttpClientFactory.CreateClient();
+            isLoadingCorrelation = true;
+            correlationError = string.Empty;
 
-            // Use filtered items if filters are active, otherwise use all items
-            var itemsToAnalyze = HasActiveFilters() ? filteredTrashItems : trashItems;
-            
-            // Prepare trash items data (use filtered or all data based on filters)
-            var trashItemsToSend = itemsToAnalyze
-                .Select(item => new
+            try
+            {
+                Console.WriteLine("Starting correlation data load...");
+                var httpClient = HttpClientFactory.CreateClient();
+
+                // Use filtered items if filters are active, otherwise use all items
+                var itemsToAnalyze = HasActiveFilters() ? filteredTrashItems : trashItems;
+
+                // Prepare trash items data (use filtered or all data based on filters)
+                var trashItemsToSend = itemsToAnalyze
+                    .Select(item => new
+                    {
+                        id = item.Id.ToString(),
+                        litterType = item.LitterType,
+                        latitude = item.Latitude,
+                        longitude = item.Longitude,
+                        timestamp = item.Timestamp
+                    }).ToList();
+
+                Console.WriteLine($"Sending {trashItemsToSend.Count} trash items to API (filtered: {HasActiveFilters()})");
+
+                var daysBack = selectedPeriod switch
                 {
-                    id = item.Id.ToString(),
-                    litterType = item.LitterType,
-                    latitude = item.Latitude,
-                    longitude = item.Longitude,
-                    timestamp = item.Timestamp
-                }).ToList();
-
-            Console.WriteLine($"Sending {trashItemsToSend.Count} trash items to API (filtered: {HasActiveFilters()})");
-
-            var daysBack = selectedPeriod switch
-            {
-                "week" => 7,
-                "month" => 31,
-                "year" => 365,
-                _ => 31
-            };
-
-            var requestData = new
-            {
-                trash_items = trashItemsToSend,
-                latitude = 51.5912, // Breda coordinates
-                longitude = 4.7761,
-                days_back = daysBack
-            };
-
-            Console.WriteLine($"Making API request with {daysBack} days back...");
-            var response = await httpClient.PostAsJsonAsync("http://localhost:8000/api/correlation/analyze", requestData);
-
-            Console.WriteLine($"API Response status: {response.StatusCode}");
-
-            if (response.IsSuccessStatusCode)
-            {
-                var responseContent = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"API Response received - Length: {responseContent.Length} characters");
-
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                    "week" => 7,
+                    "month" => 31,
+                    "year" => 365,
+                    _ => 31
                 };
 
-                correlationData = JsonSerializer.Deserialize<CorrelationData>(responseContent, options);
-
-                if (correlationData != null)
+                var requestData = new
                 {
-                    Console.WriteLine($"Successfully parsed correlation data:");
-                    Console.WriteLine($"  - Coefficient: {correlationData.CorrelationCoefficient}");
-                    Console.WriteLine($"  - Strength: {correlationData.CorrelationStrength}");
-                    Console.WriteLine($"  - Sunny: {correlationData.SunnyWeatherPercentage}%");
-                    Console.WriteLine($"  - Rainy: {correlationData.RainyWeatherPercentage}%");
-                    Console.WriteLine($"  - Temperature data points: {correlationData.ChartData.TemperatureData.Temperature.Count}");
-                    Console.WriteLine($"  - Insights count: {correlationData.Insights.Count}");
-                    Console.WriteLine($"  - Using filtered data: {HasActiveFilters()}");
+                    trash_items = trashItemsToSend,
+                    latitude = 51.5912, // Breda coordinates
+                    longitude = 4.7761,
+                    days_back = daysBack
+                };
 
-                    // Force state change to render HTML
-                    StateHasChanged();
+                Console.WriteLine($"Making API request with {daysBack} days back...");
+                var response = await httpClient.PostAsJsonAsync("http://localhost:8000/api/correlation/analyze", requestData);
 
-                    // Wait longer for DOM to update and start chart initialization in background
-                    _ = Task.Run(async () =>
+                Console.WriteLine($"API Response status: {response.StatusCode}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"API Response received - Length: {responseContent.Length} characters");
+
+                    var options = new JsonSerializerOptions
                     {
-                        await Task.Delay(1000); // Wait 1 second for DOM to be ready
-                        await InvokeAsync(async () =>
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                    };
+
+                    correlationData = JsonSerializer.Deserialize<CorrelationData>(responseContent, options);
+
+                    if (correlationData != null)
+                    {
+                        Console.WriteLine($"Successfully parsed correlation data:");
+                        Console.WriteLine($"  - Coefficient: {correlationData.CorrelationCoefficient}");
+                        Console.WriteLine($"  - Strength: {correlationData.CorrelationStrength}");
+                        Console.WriteLine($"  - Sunny: {correlationData.SunnyWeatherPercentage}%");
+                        Console.WriteLine($"  - Rainy: {correlationData.RainyWeatherPercentage}%");
+                        Console.WriteLine($"  - Temperature data points: {correlationData.ChartData.TemperatureData.Temperature.Count}");
+                        Console.WriteLine($"  - Insights count: {correlationData.Insights.Count}");
+                        Console.WriteLine($"  - Using filtered data: {HasActiveFilters()}");
+
+                        // Force state change to render HTML
+                        StateHasChanged();
+
+                        // Wait longer for DOM to update and start chart initialization in background
+                        _ = Task.Run(async () =>
                         {
-                            await InitializeCorrelationChart();
+                            await Task.Delay(1000); // Wait 1 second for DOM to be ready
+                            await InvokeAsync(async () =>
+                            {
+                                await InitializeCorrelationChart();
+                            });
                         });
-                    });
+                    }
+                    else
+                    {
+                        correlationError = "Failed to parse correlation data from API response";
+                        Console.WriteLine(correlationError);
+                    }
                 }
                 else
                 {
-                    correlationError = "Failed to parse correlation data from API response";
-                    Console.WriteLine(correlationError);
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    correlationError = $"API Error: {response.StatusCode} - {errorContent}";
+                    Console.WriteLine($"API Error - Status: {response.StatusCode}, Content: {errorContent}");
                 }
             }
-            else
+            catch (HttpRequestException httpEx)
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                correlationError = $"API Error: {response.StatusCode} - {errorContent}";
-                Console.WriteLine($"API Error - Status: {response.StatusCode}, Content: {errorContent}");
+                correlationError = $"Network error: {httpEx.Message}. Make sure the FastAPI server is running on http://localhost:8000";
+                Console.WriteLine($"HTTP Exception in LoadCorrelationData: {httpEx}");
+            }
+            catch (JsonException jsonEx)
+            {
+                correlationError = $"JSON parsing error: {jsonEx.Message}";
+                Console.WriteLine($"JSON Exception in LoadCorrelationData: {jsonEx}");
+            }
+            catch (Exception ex)
+            {
+                correlationError = $"Unexpected error: {ex.Message}";
+                Console.WriteLine($"General Exception in LoadCorrelationData: {ex}");
+            }
+            finally
+            {
+                isLoadingCorrelation = false;
+                StateHasChanged();
             }
         }
-        catch (HttpRequestException httpEx)
-        {
-            correlationError = $"Network error: {httpEx.Message}. Make sure the FastAPI server is running on http://localhost:8000";
-            Console.WriteLine($"HTTP Exception in LoadCorrelationData: {httpEx}");
-        }
-        catch (JsonException jsonEx)
-        {
-            correlationError = $"JSON parsing error: {jsonEx.Message}";
-            Console.WriteLine($"JSON Exception in LoadCorrelationData: {jsonEx}");
-        }
-        catch (Exception ex)
-        {
-            correlationError = $"Unexpected error: {ex.Message}";
-            Console.WriteLine($"General Exception in LoadCorrelationData: {ex}");
-        }
-        finally
-        {
-            isLoadingCorrelation = false;
-            StateHasChanged();
-        }
-    }
 
         private async Task InitializeCorrelationChart()
         {
@@ -791,135 +817,135 @@ private string GetImprovedLocationFallback(float latitude, float longitude)
             }
         }
 
-private async Task<string> GetDetailedLocationAsync(float latitude, float longitude)
-{
-    var locationKey = $"{Math.Round(latitude, 4)},{Math.Round(longitude, 4)}";
-    
-    // Check cache first
-    if (locationCache.ContainsKey(locationKey))
-        return locationCache[locationKey];
+        private async Task<string> GetDetailedLocationAsync(float latitude, float longitude)
+        {
+            var locationKey = $"{Math.Round(latitude, 4)},{Math.Round(longitude, 4)}";
 
-    try
-    {
-        using var httpClient = HttpClientFactory.CreateClient();
-        httpClient.DefaultRequestHeaders.Add("User-Agent", "WasteWatchAI/1.0");
-        
-        // Use higher precision for the API call
-        var url = $"https://nominatim.openstreetmap.org/reverse?format=json&lat={latitude:F5}&lon={longitude:F5}&addressdetails=1&zoom=18";
-        
-        var response = await httpClient.GetStringAsync(url);
-        var data = JsonSerializer.Deserialize<JsonElement>(response);
-        
-        if (!data.TryGetProperty("address", out var address))
-        {
-            var fallback = GetImprovedLocationFallback(latitude, longitude);
-            locationCache[locationKey] = fallback;
-            return fallback;
-        }
-        
-        // Build detailed location string
-        var locationParts = new List<string>();
-        
-        // Add street info (prioritize road over other types)
-        if (address.TryGetProperty("road", out var road))
-        {
-            var streetName = road.GetString();
-            if (address.TryGetProperty("house_number", out var houseNumber))
-                locationParts.Add($"{streetName} {houseNumber.GetString()}");
-            else
-                locationParts.Add(streetName);
-        }
-        else if (address.TryGetProperty("pedestrian", out var pedestrian))
-        {
-            locationParts.Add(pedestrian.GetString());
-        }
-        else if (address.TryGetProperty("amenity", out var amenity))
-        {
-            locationParts.Add(amenity.GetString());
-        }
-        else if (address.TryGetProperty("leisure", out var leisure))
-        {
-            locationParts.Add(leisure.GetString());
-        }
-        
-        // Add neighborhood/suburb
-        if (address.TryGetProperty("neighbourhood", out var neighbourhood))
-            locationParts.Add(neighbourhood.GetString());
-        else if (address.TryGetProperty("suburb", out var suburb))
-            locationParts.Add(suburb.GetString());
-        else if (address.TryGetProperty("quarter", out var quarter))
-            locationParts.Add(quarter.GetString());
-        
-        // Add city
-        string city = null;
-        if (address.TryGetProperty("city", out var cityProp))
-            city = cityProp.GetString();
-        else if (address.TryGetProperty("town", out var town))
-            city = town.GetString();
-        else if (address.TryGetProperty("village", out var village))
-            city = village.GetString();
-        else if (address.TryGetProperty("municipality", out var municipality))
-            city = municipality.GetString();
-        
-        if (!string.IsNullOrEmpty(city))
-            locationParts.Add(city);
-        
-        // Combine parts intelligently
-        var result = string.Join(", ", locationParts.Where(p => !string.IsNullOrEmpty(p)).Distinct());
-        
-        if (string.IsNullOrEmpty(result))
-            result = GetImprovedLocationFallback(latitude, longitude);
-        
-        locationCache[locationKey] = result;
-        return result;
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error getting detailed location: {ex.Message}");
-        var fallback = GetImprovedLocationFallback(latitude, longitude);
-        locationCache[locationKey] = fallback;
-        return fallback;
-    }
-}
+            // Check cache first
+            if (locationCache.ContainsKey(locationKey))
+                return locationCache[locationKey];
 
-// Update PreloadLocationNames to update camera cache after API calls
-private async Task PreloadLocationNames()
-{
-    var uniqueCoordinates = trashItems
-        .Select(item => new { item.Latitude, item.Longitude })
-        .Distinct()
-        .ToList();
-
-    foreach (var coord in uniqueCoordinates)
-    {
-        try
-        {
-            var detailedLocation = await GetDetailedLocationAsync(coord.Latitude, coord.Longitude);
-            
-            // Update camera cache with detailed location
-            var roundedLat = Math.Round(coord.Latitude, 4);
-            var roundedLon = Math.Round(coord.Longitude, 4);
-            var locationKey = $"{roundedLat},{roundedLon}";
-            
-            // Find existing camera entry and update it
-            var existingCamera = cameraLocationCache.FirstOrDefault(kvp => kvp.Key == locationKey);
-            if (!existingCamera.Equals(default(KeyValuePair<string, string>)))
+            try
             {
-                var cameraNumber = existingCamera.Value.Split(' ')[1]; // Extract camera number
-                cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+                using var httpClient = HttpClientFactory.CreateClient();
+                httpClient.DefaultRequestHeaders.Add("User-Agent", "WasteWatchAI/1.0");
+
+                // Use higher precision for the API call
+                var url = $"https://nominatim.openstreetmap.org/reverse?format=json&lat={latitude:F5}&lon={longitude:F5}&addressdetails=1&zoom=18";
+
+                var response = await httpClient.GetStringAsync(url);
+                var data = JsonSerializer.Deserialize<JsonElement>(response);
+
+                if (!data.TryGetProperty("address", out var address))
+                {
+                    var fallback = GetImprovedLocationFallback(latitude, longitude);
+                    locationCache[locationKey] = fallback;
+                    return fallback;
+                }
+
+                // Build detailed location string
+                var locationParts = new List<string>();
+
+                // Add street info (prioritize road over other types)
+                if (address.TryGetProperty("road", out var road))
+                {
+                    var streetName = road.GetString();
+                    if (address.TryGetProperty("house_number", out var houseNumber))
+                        locationParts.Add($"{streetName} {houseNumber.GetString()}");
+                    else
+                        locationParts.Add(streetName);
+                }
+                else if (address.TryGetProperty("pedestrian", out var pedestrian))
+                {
+                    locationParts.Add(pedestrian.GetString());
+                }
+                else if (address.TryGetProperty("amenity", out var amenity))
+                {
+                    locationParts.Add(amenity.GetString());
+                }
+                else if (address.TryGetProperty("leisure", out var leisure))
+                {
+                    locationParts.Add(leisure.GetString());
+                }
+
+                // Add neighborhood/suburb
+                if (address.TryGetProperty("neighbourhood", out var neighbourhood))
+                    locationParts.Add(neighbourhood.GetString());
+                else if (address.TryGetProperty("suburb", out var suburb))
+                    locationParts.Add(suburb.GetString());
+                else if (address.TryGetProperty("quarter", out var quarter))
+                    locationParts.Add(quarter.GetString());
+
+                // Add city
+                string city = null;
+                if (address.TryGetProperty("city", out var cityProp))
+                    city = cityProp.GetString();
+                else if (address.TryGetProperty("town", out var town))
+                    city = town.GetString();
+                else if (address.TryGetProperty("village", out var village))
+                    city = village.GetString();
+                else if (address.TryGetProperty("municipality", out var municipality))
+                    city = municipality.GetString();
+
+                if (!string.IsNullOrEmpty(city))
+                    locationParts.Add(city);
+
+                // Combine parts intelligently
+                var result = string.Join(", ", locationParts.Where(p => !string.IsNullOrEmpty(p)).Distinct());
+
+                if (string.IsNullOrEmpty(result))
+                    result = GetImprovedLocationFallback(latitude, longitude);
+
+                locationCache[locationKey] = result;
+                return result;
             }
-            
-            // Small delay to be respectful to the API
-            await Task.Delay(200);
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting detailed location: {ex.Message}");
+                var fallback = GetImprovedLocationFallback(latitude, longitude);
+                locationCache[locationKey] = fallback;
+                return fallback;
+            }
         }
-        catch (Exception ex)
+
+        // Update PreloadLocationNames to update camera cache after API calls
+        private async Task PreloadLocationNames()
         {
-            Console.WriteLine($"Error preloading location for {coord.Latitude}, {coord.Longitude}: {ex.Message}");
+            var uniqueCoordinates = trashItems
+                .Select(item => new { item.Latitude, item.Longitude })
+                .Distinct()
+                .ToList();
+
+            foreach (var coord in uniqueCoordinates)
+            {
+                try
+                {
+                    var detailedLocation = await GetDetailedLocationAsync(coord.Latitude, coord.Longitude);
+
+                    // Update camera cache with detailed location
+                    var roundedLat = Math.Round(coord.Latitude, 4);
+                    var roundedLon = Math.Round(coord.Longitude, 4);
+                    var locationKey = $"{roundedLat},{roundedLon}";
+
+                    // Find existing camera entry and update it
+                    var existingCamera = cameraLocationCache.FirstOrDefault(kvp => kvp.Key == locationKey);
+                    if (!existingCamera.Equals(default(KeyValuePair<string, string>)))
+                    {
+                        var cameraNumber = existingCamera.Value.Split(' ')[1]; // Extract camera number
+                        cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+                    }
+
+                    // Small delay to be respectful to the API
+                    await Task.Delay(200);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error preloading location for {coord.Latitude}, {coord.Longitude}: {ex.Message}");
+                }
+            }
+
+            // Trigger UI update after all locations are loaded
+            StateHasChanged();
         }
-    }
-    
-    // Trigger UI update after all locations are loaded
-    StateHasChanged();
-}
     }
 }

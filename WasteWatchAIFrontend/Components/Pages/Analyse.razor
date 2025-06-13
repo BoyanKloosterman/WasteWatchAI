@@ -88,7 +88,14 @@
         <!-- Data Summary -->
         <div class="alert alert-info mb-4">
             <i class="fas fa-info-circle me-2"></i>
-            Totaal @trashItems.Count afvalitems geladen uit de database.
+            @if (HasActiveFilters())
+            {
+                <span>Totaal @GetDisplayItemCount() afvalitems @(GetDisplayItemCount() == trashItems.Count ? "geladen" : "gevonden") uit de database.</span>
+            }
+            else
+            {
+                <span>Totaal @trashItems.Count afvalitems geladen uit de database.</span>
+            }
         </div>
 
         <!-- Chart Section -->
