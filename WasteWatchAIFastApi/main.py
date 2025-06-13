@@ -203,6 +203,12 @@ def generate_dummy_weather_data(start_date: str, end_date: str):
 @app.post("/api/correlation/analyze", response_model=CorrelationResponse)
 async def analyze_correlation(request: CorrelationRequest):
     try:
+        # Log incoming request details
+        print(f"Received correlation request:")
+        print(f"  - Trash items: {len(request.trash_items)}")
+        print(f"  - Days back: {request.days_back}")
+        print(f"  - Location: {request.latitude}, {request.longitude}")
+        
         # Define weather_code_to_category function first
         def weather_code_to_category(code):
             """Converts Open-Meteo weather code to a human-readable weather category."""
@@ -238,9 +244,12 @@ async def analyze_correlation(request: CorrelationRequest):
         latitude = 51.5865  # Breda centrum
         longitude = 4.7761  # Breda centrum
         
-        # Calculate date reach (past 31 days)
+        # Calculate date range based on request
         end_date = datetime.now().date()  # Today
         start_date = end_date - timedelta(days=request.days_back)
+        
+        # Log date range
+        print(f"Analyzing period: {start_date} to {end_date} ({request.days_back} days)")
 
         weather_data = await fetch_weather_data(
             latitude, 
@@ -320,23 +329,18 @@ async def analyze_correlation(request: CorrelationRequest):
         avg_temps = []
         for i in range(len(max_temps)):
             try:
-                max_temp = float(max_temps[i]) if max_temps[i] is not None else 15.0
-                min_temp = float(min_temps[i]) if min_temps[i] is not None else 10.0
-                avg_temp = (max_temp + min_temp) / 2
-                avg_temps.append(avg_temp)
+                avg_temp = (float(max_temps[i]) + float(min_temps[i])) / 2
+                avg_temps.append(round(avg_temp, 1))
             except (ValueError, TypeError):
-                avg_temps.append(12.5)  # Default average temp for Netherlands
+                avg_temps.append(12.5)  # Default temperature for Netherlands
         
         # Safely convert weather codes to integers
         safe_weather_codes = []
         for code in weather_codes:
             try:
-                if code is not None and code != '':
-                    safe_weather_codes.append(int(code))
-                else:
-                    safe_weather_codes.append(0)  # Default to clear sky
+                safe_weather_codes.append(int(code))
             except (ValueError, TypeError):
-                safe_weather_codes.append(0)
+                safe_weather_codes.append(0)  # Default to sunny
         
         # Create dataframe for weather data
         weather_df = pd.DataFrame({
@@ -352,16 +356,15 @@ async def analyze_correlation(request: CorrelationRequest):
         print(f"Weather DataFrame created with {len(weather_df)} rows")
         print(f"Temperature range: {weather_df['avg_temp'].min():.1f}°C to {weather_df['avg_temp'].max():.1f}°C")
         
-        # Enhanced logging to verify real data
-        print(f"Temperature verification:")
-        if len(max_temps) > 0:
-            recent_temp = max_temps[-1] if len(max_temps) > 0 else "N/A"
-            print(f"   Most recent max temp: {recent_temp}°C")
-            print(f"   Sample temps: {max_temps[:3]} max, {min_temps[:3]} min")
-            safe_precipitation = [p for p in precipitation if p is not None]
-            print(f"   Precipitation days: {sum(1 for p in safe_precipitation if p > 0)}/{len(safe_precipitation)}")
+        # Process trash items - filter by date range if provided
+        filtered_trash_items = []
+        for item in request.trash_items:
+            item_date = item.timestamp.date()
+            if start_date <= item_date <= end_date:
+                filtered_trash_items.append(item)
         
-        # Process trash items
+        print(f"Filtered trash items: {len(filtered_trash_items)} out of {len(request.trash_items)} within date range")
+        
         trash_df = pd.DataFrame([
             {
                 'date': item.timestamp.date(),
@@ -369,14 +372,13 @@ async def analyze_correlation(request: CorrelationRequest):
                 'latitude': item.latitude,
                 'longitude': item.longitude
             }
-            for item in request.trash_items
-            if item.timestamp.date() >= start_date and item.timestamp.date() <= end_date
+            for item in filtered_trash_items
         ])
         
         print(f"Trash DataFrame created with {len(trash_df)} rows")
         
         if trash_df.empty:
-            print("No real trash data found, creating realistic dummy data based on weather patterns")
+            print("No real trash data found in date range, creating realistic dummy data based on weather patterns")
             dummy_dates = pd.date_range(start=start_date, end=end_date, freq='D')
             
             # Create more realistic trash data that correlates with weather
@@ -449,8 +451,8 @@ async def analyze_correlation(request: CorrelationRequest):
         overall_avg_trash = merged_df['trash_count'].mean()
         
         if overall_avg_trash > 0:
-            sunny_percentage_diff = ((sunny_avg_trash - overall_avg_trash) / overall_avg_trash * 100) if sunny_avg_trash > 0 else 0
-            rainy_percentage_diff = ((rainy_avg_trash - overall_avg_trash) / overall_avg_trash * 100) if rainy_avg_trash > 0 else 0
+            sunny_percentage_diff = ((sunny_avg_trash - overall_avg_trash) / overall_avg_trash) * 100
+            rainy_percentage_diff = ((rainy_avg_trash - overall_avg_trash) / overall_avg_trash) * 100
         else:
             sunny_percentage_diff = 0
             rainy_percentage_diff = 0
@@ -461,13 +463,13 @@ async def analyze_correlation(request: CorrelationRequest):
         # Determine correlation strength
         abs_temp_corr = abs(temp_correlation)
         if abs_temp_corr > 0.7:
-            correlation_strength = "Sterke correlatie"
+            correlation_strength = "Zeer sterk"
         elif abs_temp_corr > 0.4:
-            correlation_strength = "Matige correlatie"
+            correlation_strength = "Sterk"
         elif abs_temp_corr > 0.2:
-            correlation_strength = "Zwakke correlatie"
+            correlation_strength = "Matig"
         else:
-            correlation_strength = "Geen significante correlatie"
+            correlation_strength = "Zwak"
         
         # Generate insights based on correlations
         insights = []
@@ -476,39 +478,40 @@ async def analyze_correlation(request: CorrelationRequest):
         insights.append(f"Weerdata voor Breda centrum (51.5865°N, 4.7761°E)")
         insights.append(data_source_message)
         
+        # Add filter information to insights
+        insights.append(f"Analyse periode: {start_date.strftime('%d-%m-%Y')} tot {end_date.strftime('%d-%m-%Y')}")
+        if len(filtered_trash_items) != len(request.trash_items):
+            insights.append(f"Gefilterde data: {len(filtered_trash_items)} van {len(request.trash_items)} afvalitems gebruikt")
+        
         # Temperature insights
         if temp_correlation > 0.4:
-            insights.append(f"Sterke positieve correlatie: bij hogere temperaturen wordt significant meer afval gedetecteerd (r={temp_correlation:.3f})")
+            insights.append(f"Sterke positieve correlatie: bij warmere temperaturen wordt meer afval gedetecteerd")
         elif temp_correlation > 0.2:
-            insights.append(f"Matige correlatie: warmere dagen tonen iets meer afval (r={temp_correlation:.3f})")
+            insights.append(f"Matige positieve correlatie: warmer weer leidt tot iets meer afval")
         elif temp_correlation < -0.4:
-            insights.append(f"Sterke negatieve correlatie: bij hogere temperaturen wordt minder afval gevonden (r={temp_correlation:.3f})")
+            insights.append(f"Sterke negatieve correlatie: bij kouder weer wordt meer afval gedetecteerd")
         elif temp_correlation < -0.2:
-            insights.append(f"Lichte negatieve correlatie met temperatuur (r={temp_correlation:.3f})")
+            insights.append(f"Matige negatieve correlatie: kouder weer leidt tot iets meer afval")
         else:
-            insights.append(f"Geen significante correlatie tussen temperatuur en afvalvolume (r={temp_correlation:.3f})")
+            insights.append(f"Geen duidelijke relatie tussen temperatuur en afvaldetecties")
         
         # Weather pattern insights with percentage differences
         if abs(sunny_percentage_diff) > 10:
-            if sunny_percentage_diff > 0:
-                insights.append(f"Zonnig weer: {sunny_percentage_diff:+.0f}% meer afval dan gemiddeld")
-            else:
-                insights.append(f"Zonnig weer: {sunny_percentage_diff:.0f}% minder afval dan gemiddeld")
+            direction = "meer" if sunny_percentage_diff > 0 else "minder"
+            insights.append(f"Bij zonnig weer: {abs(sunny_percentage_diff):.0f}% {direction} afval dan gemiddeld")
         
         if abs(rainy_percentage_diff) > 10:
-            if rainy_percentage_diff > 0:
-                insights.append(f"Regenachtig weer: {rainy_percentage_diff:+.0f}% meer afval dan gemiddeld")
-            else:
-                insights.append(f"Regenachtig weer: {rainy_percentage_diff:.0f}% minder afval dan gemiddeld")
+            direction = "meer" if rainy_percentage_diff > 0 else "minder"
+            insights.append(f"Bij regenachtig weer: {abs(rainy_percentage_diff):.0f}% {direction} afval dan gemiddeld")
         
         if abs(sunny_percentage_diff) <= 10 and abs(rainy_percentage_diff) <= 10:
-            insights.append("Weertype heeft beperkte invloed op afvalvolume (minder dan 10% verschil)")
+            insights.append("Weersomstandigheden hebben geen significante invloed op afvaldetecties")
         
         # Precipitation insights
         if precipitation_correlation < -0.3:
-            insights.append(f"Neerslag reduceert zwerfafval significant (r={precipitation_correlation:.3f}) - mensen blijven binnen")
+            insights.append("Regen lijkt afvaldetecties te verminderen (mensen blijven binnen)")
         elif precipitation_correlation > 0.3:
-            insights.append(f"Meer neerslag correleert met meer afval (r={precipitation_correlation:.3f}) - mogelijk door storm/wind")
+            insights.append("Regen lijkt tot meer afvaldetecties te leiden (afval spoelt aan)")
         
         # Seasonal/location insights
         avg_temp = merged_df['avg_temp'].mean()
@@ -518,13 +521,12 @@ async def analyze_correlation(request: CorrelationRequest):
         insights.append(f"Totaal gedetecteerd afval: {int(total_trash)} items over {total_days} dagen")
         
         if total_trash > 0:
-            peak_day = merged_df.loc[merged_df['trash_count'].idxmax()]
-            insights.append(f"Piekdag: {peak_day['date'].strftime('%d-%m')} met {int(peak_day['trash_count'])} items bij {peak_day['avg_temp']:.1f}°C")
+            insights.append(f"Gemiddeld {total_trash/total_days:.1f} afvaldetecties per dag")
         
         # Add general insights
         insights.append(f"Analyse gebaseerd op {total_days} dagen weerdata")
         
-        print(f" FINAL DATA SOURCE: {'DUMMY/SIMULATED' if is_dummy_data else 'REAL WEATHER API'}")
+        print(f"FINAL DATA SOURCE: {'DUMMY/SIMULATED' if is_dummy_data else 'REAL WEATHER API'}")
         
         # Prepare chart data with weather categories
         chart_data = {
