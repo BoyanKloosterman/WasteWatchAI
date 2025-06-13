@@ -20,6 +20,7 @@ namespace WasteWatchAIFrontend.Components.Pages
         private List<FrequencyDataItem> frequencyData = new();
         private readonly Dictionary<string, string> cameraLocationCache = new();
         private readonly Dictionary<string, string> locationCache = new();
+
         private bool isLoading = true;
         private string selectedPeriod = string.Empty;
         private string selectedLocation = string.Empty;
@@ -46,6 +47,12 @@ namespace WasteWatchAIFrontend.Components.Pages
                 await LoadDummyTrashData();
             else
                 await LoadRealTrashData();
+
+            // Pre-load detailed locations for real data
+            if (!useDummyData && trashItems.Any())
+            {
+                await PreloadLocationNames();
+            }
 
             await ProcessData();
             await LoadCorrelationData();
@@ -239,8 +246,19 @@ namespace WasteWatchAIFrontend.Components.Pages
         if (!cameraLocationCache.ContainsKey(locationKey))
         {
             var cameraNumber = cameraLocationCache.Count + 1;
-            var generalLocation = GetGeneralLocationFallback(latitude, longitude);
-            cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {generalLocation}";
+            
+            // Check if we have detailed location in cache
+            if (locationCache.ContainsKey(locationKey))
+            {
+                var detailedLocation = locationCache[locationKey];
+                cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+            }
+            else
+            {
+                // Use improved fallback while API loads
+                var detailedLocation = GetImprovedLocationFallback(latitude, longitude);
+                cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+            }
         }
         
         return cameraLocationCache[locationKey];
@@ -274,6 +292,52 @@ namespace WasteWatchAIFrontend.Components.Pages
     var random = new Random((int)(latitude * 1000 + longitude * 1000));
     var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
     return locations[random.Next(locations.Length)];
+}
+
+private string GetImprovedLocationFallback(float latitude, float longitude)
+{
+    // More precise Breda locations using exact coordinates
+    
+    // Chasséveld Breda (51.58894, 4.78522)
+    if (latitude >= 51.588 && latitude <= 51.590 && longitude >= 4.784 && longitude <= 4.786)
+        return "Chasséveld, Breda";
+    
+    // Grote Markt Breda
+    if (latitude >= 51.588 && latitude <= 51.591 && longitude >= 4.774 && longitude <= 4.777)
+        return "Grote Markt, Centrum, Breda";
+    
+    // Centraal Station Breda
+    if (latitude >= 51.595 && latitude <= 51.597 && longitude >= 4.778 && longitude <= 4.780)
+        return "Stationsplein, Breda Centraal";
+    
+    // Valkenberg Park
+    if (latitude >= 51.592 && latitude <= 51.595 && longitude >= 4.778 && longitude <= 4.781)
+        return "Valkenberg Park, Breda";
+    
+    // Haagdijk
+    if (latitude >= 51.591 && latitude <= 51.594 && longitude >= 4.767 && longitude <= 4.770)
+        return "Haagdijk, Breda";
+    
+    // Chassé Park
+    if (latitude >= 51.585 && latitude <= 51.587 && longitude >= 4.784 && longitude <= 4.786)
+        return "Chassé Park, Breda";
+    
+    // Broader Breda area
+    if (latitude >= 51.55 && latitude <= 51.62 && longitude >= 4.73 && longitude <= 4.82)
+        return "Breda";
+    
+    // Other major Dutch cities with more precise ranges
+    if (latitude >= 52.35 && latitude <= 52.38 && longitude >= 4.88 && longitude <= 4.92)
+        return "Amsterdam Centrum";
+    
+    if (latitude >= 51.91 && latitude <= 51.93 && longitude >= 4.46 && longitude <= 4.49)
+        return "Rotterdam Centrum";
+    
+    if (latitude >= 52.06 && latitude <= 52.08 && longitude >= 4.29 && longitude <= 4.32)
+        return "Den Haag Centrum";
+    
+    // Use more precise coordinates in fallback
+    return $"Nederland ({Math.Round(latitude, 3)}, {Math.Round(longitude, 3)})";
 }
 
         private string GetDayAbbreviation(DayOfWeek day)
@@ -707,9 +771,9 @@ namespace WasteWatchAIFrontend.Components.Pages
             }
         }
 
-private async Task<string> GetGeneralLocationAsync(float latitude, float longitude)
+private async Task<string> GetDetailedLocationAsync(float latitude, float longitude)
 {
-    var locationKey = $"{Math.Round(latitude, 3)},{Math.Round(longitude, 3)}";
+    var locationKey = $"{Math.Round(latitude, 4)},{Math.Round(longitude, 4)}";
     
     // Check cache first
     if (locationCache.ContainsKey(locationKey))
@@ -720,45 +784,122 @@ private async Task<string> GetGeneralLocationAsync(float latitude, float longitu
         using var httpClient = HttpClientFactory.CreateClient();
         httpClient.DefaultRequestHeaders.Add("User-Agent", "WasteWatchAI/1.0");
         
-        var url = $"https://nominatim.openstreetmap.org/reverse?format=json&lat={latitude}&lon={longitude}&addressdetails=1&extratags=1";
+        // Use higher precision for the API call
+        var url = $"https://nominatim.openstreetmap.org/reverse?format=json&lat={latitude:F5}&lon={longitude:F5}&addressdetails=1&zoom=18";
         
         var response = await httpClient.GetStringAsync(url);
         var data = JsonSerializer.Deserialize<JsonElement>(response);
         
-        var address = data.GetProperty("address");
+        if (!data.TryGetProperty("address", out var address))
+        {
+            var fallback = GetImprovedLocationFallback(latitude, longitude);
+            locationCache[locationKey] = fallback;
+            return fallback;
+        }
         
-        // Try to get city/town/village
-        string location = "Onbekende locatie";
-        if (address.TryGetProperty("city", out var city))
-            location = city.GetString() ?? location;
+        // Build detailed location string
+        var locationParts = new List<string>();
+        
+        // Add street info (prioritize road over other types)
+        if (address.TryGetProperty("road", out var road))
+        {
+            var streetName = road.GetString();
+            if (address.TryGetProperty("house_number", out var houseNumber))
+                locationParts.Add($"{streetName} {houseNumber.GetString()}");
+            else
+                locationParts.Add(streetName);
+        }
+        else if (address.TryGetProperty("pedestrian", out var pedestrian))
+        {
+            locationParts.Add(pedestrian.GetString());
+        }
+        else if (address.TryGetProperty("amenity", out var amenity))
+        {
+            locationParts.Add(amenity.GetString());
+        }
+        else if (address.TryGetProperty("leisure", out var leisure))
+        {
+            locationParts.Add(leisure.GetString());
+        }
+        
+        // Add neighborhood/suburb
+        if (address.TryGetProperty("neighbourhood", out var neighbourhood))
+            locationParts.Add(neighbourhood.GetString());
+        else if (address.TryGetProperty("suburb", out var suburb))
+            locationParts.Add(suburb.GetString());
+        else if (address.TryGetProperty("quarter", out var quarter))
+            locationParts.Add(quarter.GetString());
+        
+        // Add city
+        string city = null;
+        if (address.TryGetProperty("city", out var cityProp))
+            city = cityProp.GetString();
         else if (address.TryGetProperty("town", out var town))
-            location = town.GetString() ?? location;
+            city = town.GetString();
         else if (address.TryGetProperty("village", out var village))
-            location = village.GetString() ?? location;
+            city = village.GetString();
         else if (address.TryGetProperty("municipality", out var municipality))
-            location = municipality.GetString() ?? location;
+            city = municipality.GetString();
         
-        locationCache[locationKey] = location;
-        return location;
+        if (!string.IsNullOrEmpty(city))
+            locationParts.Add(city);
+        
+        // Combine parts intelligently
+        var result = string.Join(", ", locationParts.Where(p => !string.IsNullOrEmpty(p)).Distinct());
+        
+        if (string.IsNullOrEmpty(result))
+            result = GetImprovedLocationFallback(latitude, longitude);
+        
+        locationCache[locationKey] = result;
+        return result;
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Error getting location: {ex.Message}");
-        return $"Locatie ({Math.Round(latitude, 2)}, {Math.Round(longitude, 2)})";
+        Console.WriteLine($"Error getting detailed location: {ex.Message}");
+        var fallback = GetImprovedLocationFallback(latitude, longitude);
+        locationCache[locationKey] = fallback;
+        return fallback;
     }
 }
 
-private string GetGeneralLocationFallback(float latitude, float longitude)
+// Update PreloadLocationNames to update camera cache after API calls
+private async Task PreloadLocationNames()
 {
-    // Simple fallback based on major Dutch cities
-    if (latitude >= 51.55 && latitude <= 51.62 && longitude >= 4.73 && longitude <= 4.82)
-        return "Breda";
-    if (latitude >= 52.30 && latitude <= 52.42 && longitude >= 4.70 && longitude <= 5.00)
-        return "Amsterdam";
-    if (latitude >= 51.85 && latitude <= 51.96 && longitude >= 4.35 && longitude <= 4.60)
-        return "Rotterdam";
+    var uniqueCoordinates = trashItems
+        .Select(item => new { item.Latitude, item.Longitude })
+        .Distinct()
+        .ToList();
+
+    foreach (var coord in uniqueCoordinates)
+    {
+        try
+        {
+            var detailedLocation = await GetDetailedLocationAsync(coord.Latitude, coord.Longitude);
+            
+            // Update camera cache with detailed location
+            var roundedLat = Math.Round(coord.Latitude, 4);
+            var roundedLon = Math.Round(coord.Longitude, 4);
+            var locationKey = $"{roundedLat},{roundedLon}";
+            
+            // Find existing camera entry and update it
+            var existingCamera = cameraLocationCache.FirstOrDefault(kvp => kvp.Key == locationKey);
+            if (!existingCamera.Equals(default(KeyValuePair<string, string>)))
+            {
+                var cameraNumber = existingCamera.Value.Split(' ')[1]; // Extract camera number
+                cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+            }
+            
+            // Small delay to be respectful to the API
+            await Task.Delay(200);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error preloading location for {coord.Latitude}, {coord.Longitude}: {ex.Message}");
+        }
+    }
     
-    return $"Nederland ({Math.Round(latitude, 2)}, {Math.Round(longitude, 2)})";
+    // Trigger UI update after all locations are loaded
+    StateHasChanged();
 }
     }
 }
