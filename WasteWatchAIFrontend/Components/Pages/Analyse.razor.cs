@@ -14,6 +14,7 @@ namespace WasteWatchAIFrontend.Components.Pages
         [Inject] private IJSRuntime JS { get; set; } = default!;
 
         // State variables
+        private List<TrashItem> filteredTrashItems = new();
         private List<TrashItem> trashItems = new();
         private List<LocationChartData> locationChartData = new();
         private List<FrequencyDataItem> frequencyData = new();
@@ -287,100 +288,121 @@ namespace WasteWatchAIFrontend.Components.Pages
         }
 
         private string GetFilterSummary()
+    {
+        var parts = new List<string>();
+
+        // Periode
+        if (!string.IsNullOrEmpty(selectedPeriod))
         {
-            var parts = new List<string>();
-
-            // Periode
-            if (!string.IsNullOrEmpty(selectedPeriod))
+            parts.Add(selectedPeriod switch
             {
-                parts.Add(selectedPeriod switch
-                {
-                    "week" => "de afgelopen week",
-                    "month" => "de afgelopen maand",
-                    "year" => "het afgelopen jaar",
-                    _ => ""
-                });
-            }
-            else
-            {
-                parts.Add("de volledige periode");
-            }
-
-            // Locatie
-            if (!string.IsNullOrEmpty(selectedLocation))
-                parts.Add($"locatie: {selectedLocation}");
-            else
-                parts.Add("alle locaties");
-
-            // Categorie
-            if (!string.IsNullOrEmpty(selectedCategory))
-            {
-                var cat = selectedCategory switch
-                {
-                    "plastic" => "Plastic",
-                    "papier" => "Papier",
-                    "gft" => "GFT/Organisch",
-                    "glas" => "Glas",
-                    _ => selectedCategory
-                };
-                parts.Add($"categorie: {cat}");
-            }
-            else
-            {
-                parts.Add("alle categorieën");
-            }
-
-            return string.Join(", ", parts);
+                "week" => "de afgelopen week",
+                "month" => "de afgelopen maand",
+                "year" => "het afgelopen jaar",
+                _ => ""
+            });
+        }
+        else
+        {
+            parts.Add("de volledige periode");
         }
 
-        private async Task ApplyFilters()
+        // Locatie
+        if (!string.IsNullOrEmpty(selectedLocation))
+            parts.Add($"locatie: {selectedLocation}");
+        else
+            parts.Add("alle locaties");
+
+        // Categorie
+        if (!string.IsNullOrEmpty(selectedCategory))
         {
-            var filteredItems = trashItems.AsEnumerable();
-
-            if (!string.IsNullOrEmpty(selectedPeriod))
+            var cat = selectedCategory switch
             {
-                var now = DateTime.Now;
-                filteredItems = selectedPeriod switch
-                {
-                    "week" => filteredItems.Where(item => item.Timestamp >= now.AddDays(-7)),
-                    "month" => filteredItems.Where(item => item.Timestamp >= now.AddMonths(-1)),
-                    "year" => filteredItems.Where(item => item.Timestamp >= now.AddYears(-1)),
-                    _ => filteredItems
-                };
-            }
+                "plastic" => "Plastic",
+                "papier" => "Papier",
+                "gft" => "GFT/Organisch",
+                "glas" => "Glas",
+                _ => selectedCategory
+            };
+            parts.Add($"categorie: {cat}");
+        }
+        else
+        {
+            parts.Add("alle categorieën");
+        }
 
-            if (!string.IsNullOrEmpty(selectedCategory))
+        // Add item count if filters are active
+        if (HasActiveFilters())
+        {
+            var itemCount = filteredTrashItems?.Count ?? 0;
+            parts.Add($"({itemCount} items)");
+        }
+        else
+        {
+            parts.Add($"({trashItems.Count} items)");
+        }
+
+        return string.Join(", ", parts);
+    }
+
+
+ private async Task ApplyFilters()
+    {
+        var filteredItems = trashItems.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(selectedPeriod))
+        {
+            var now = DateTime.Now;
+            filteredItems = selectedPeriod switch
             {
-                var categoryMap = new Dictionary<string, string>
-                {
-                    { "plastic", "Plastic" },
-                    { "papier", "Papier" },
-                    { "gft", "Organisch" },
-                    { "glas", "Glas" }
-                };
+                "week" => filteredItems.Where(item => item.Timestamp >= now.AddDays(-7)),
+                "month" => filteredItems.Where(item => item.Timestamp >= now.AddMonths(-1)),
+                "year" => filteredItems.Where(item => item.Timestamp >= now.AddYears(-1)),
+                _ => filteredItems
+            };
+        }
 
-                if (categoryMap.TryGetValue(selectedCategory, out var actualCategory))
-                {
-                    filteredItems = filteredItems.Where(item =>
-                        item.LitterType.Equals(actualCategory, StringComparison.OrdinalIgnoreCase));
-                }
-            }
+        if (!string.IsNullOrEmpty(selectedCategory))
+        {
+            var categoryMap = new Dictionary<string, string>
+            {
+                { "plastic", "Plastic" },
+                { "papier", "Papier" },
+                { "gft", "Organisch" },
+                { "glas", "Glas" }
+            };
 
-            if (!string.IsNullOrEmpty(selectedLocation))
+            if (categoryMap.TryGetValue(selectedCategory, out var actualCategory))
             {
                 filteredItems = filteredItems.Where(item =>
-                    GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase));
+                    item.LitterType.Equals(actualCategory, StringComparison.OrdinalIgnoreCase));
             }
-
-            var originalItems = trashItems;
-            trashItems = filteredItems.ToList();
-
-            await ProcessData();
-            trashItems = originalItems;
-
-            StateHasChanged();
-            await InitializeCharts();
         }
+
+        if (!string.IsNullOrEmpty(selectedLocation))
+        {
+            filteredItems = filteredItems.Where(item =>
+                GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Store filtered items for correlation analysis
+        filteredTrashItems = filteredItems.ToList();
+        
+        // Update trash items temporarily for processing
+        var originalItems = trashItems;
+        trashItems = filteredTrashItems;
+
+        await ProcessData();
+        
+        // Reload correlation data with filtered items
+        await LoadCorrelationData();
+        
+        // Restore original items
+        trashItems = originalItems;
+
+        StateHasChanged();
+        await InitializeCharts();
+    }
 
         // New method for handling filter changes
         private async Task OnFilterChanged()
@@ -420,114 +442,125 @@ namespace WasteWatchAIFrontend.Components.Pages
                 .ToList();
         }
 
-        private async Task LoadCorrelationData()
+         private async Task LoadCorrelationData()
+    {
+        isLoadingCorrelation = true;
+        correlationError = string.Empty;
+
+        try
         {
-            isLoadingCorrelation = true;
-            correlationError = string.Empty;
+            Console.WriteLine("Starting correlation data load...");
+            var httpClient = HttpClientFactory.CreateClient();
 
-            try
-            {
-                Console.WriteLine("Starting correlation data load...");
-                var httpClient = HttpClientFactory.CreateClient();
-
-                // Prepare trash items data (use dummy or real based on toggle)
-                var trashItemsToSend = trashItems
-                    .Select(item => new
-                    {
-                        id = item.Id.ToString(),
-                        litterType = item.LitterType,
-                        latitude = item.Latitude,
-                        longitude = item.Longitude,
-                        timestamp = item.Timestamp
-                    }).ToList();
-
-                Console.WriteLine($"Sending {trashItemsToSend.Count} trash items to API");
-
-                var requestData = new
+            // Use filtered items if filters are active, otherwise use all items
+            var itemsToAnalyze = HasActiveFilters() ? filteredTrashItems : trashItems;
+            
+            // Prepare trash items data (use filtered or all data based on filters)
+            var trashItemsToSend = itemsToAnalyze
+                .Select(item => new
                 {
-                    trash_items = trashItemsToSend,
-                    latitude = 51.5912, // Breda coordinates
-                    longitude = 4.7761,
-                    days_back = 30
+                    id = item.Id.ToString(),
+                    litterType = item.LitterType,
+                    latitude = item.Latitude,
+                    longitude = item.Longitude,
+                    timestamp = item.Timestamp
+                }).ToList();
+
+            Console.WriteLine($"Sending {trashItemsToSend.Count} trash items to API (filtered: {HasActiveFilters()})");
+
+            // Adjust days_back based on period filter
+            var daysBack = selectedPeriod switch
+            {
+                "week" => 7,
+                "month" => 31,
+                "year" => 365,
+                _ => 31
+            };
+
+            var requestData = new
+            {
+                trash_items = trashItemsToSend,
+                latitude = 51.5912, // Breda coordinates
+                longitude = 4.7761,
+                days_back = daysBack
+            };
+
+            Console.WriteLine($"Making API request with {daysBack} days back...");
+            var response = await httpClient.PostAsJsonAsync("http://localhost:8000/api/correlation/analyze", requestData);
+
+            Console.WriteLine($"API Response status: {response.StatusCode}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"API Response received - Length: {responseContent.Length} characters");
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                 };
 
-                Console.WriteLine("Making API request...");
-                var response = await httpClient.PostAsJsonAsync("http://localhost:8000/api/correlation/analyze", requestData);
+                correlationData = JsonSerializer.Deserialize<CorrelationData>(responseContent, options);
 
-                Console.WriteLine($"API Response status: {response.StatusCode}");
-
-                if (response.IsSuccessStatusCode)
+                if (correlationData != null)
                 {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"API Response received - Length: {responseContent.Length} characters");
+                    Console.WriteLine($"Successfully parsed correlation data:");
+                    Console.WriteLine($"  - Coefficient: {correlationData.CorrelationCoefficient}");
+                    Console.WriteLine($"  - Strength: {correlationData.CorrelationStrength}");
+                    Console.WriteLine($"  - Sunny: {correlationData.SunnyWeatherPercentage}%");
+                    Console.WriteLine($"  - Rainy: {correlationData.RainyWeatherPercentage}%");
+                    Console.WriteLine($"  - Temperature data points: {correlationData.ChartData.TemperatureData.Temperature.Count}");
+                    Console.WriteLine($"  - Insights count: {correlationData.Insights.Count}");
+                    Console.WriteLine($"  - Using filtered data: {HasActiveFilters()}");
 
-                    var options = new JsonSerializerOptions
+                    // Force state change to render HTML
+                    StateHasChanged();
+
+                    // Wait longer for DOM to update and start chart initialization in background
+                    _ = Task.Run(async () =>
                     {
-                        PropertyNameCaseInsensitive = true,
-                        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-                    };
-
-                    correlationData = JsonSerializer.Deserialize<CorrelationData>(responseContent, options);
-
-                    if (correlationData != null)
-                    {
-                        Console.WriteLine($"Successfully parsed correlation data:");
-                        Console.WriteLine($"  - Coefficient: {correlationData.CorrelationCoefficient}");
-                        Console.WriteLine($"  - Strength: {correlationData.CorrelationStrength}");
-                        Console.WriteLine($"  - Sunny: {correlationData.SunnyWeatherPercentage}%");
-                        Console.WriteLine($"  - Rainy: {correlationData.RainyWeatherPercentage}%");
-                        Console.WriteLine($"  - Temperature data points: {correlationData.ChartData.TemperatureData.Temperature.Count}");
-                        Console.WriteLine($"  - Weather distribution labels: {correlationData.ChartData.WeatherDistribution.Labels.Count}");
-                        Console.WriteLine($"  - Correlation scatter points: {correlationData.ChartData.CorrelationScatter.Temperature.Count}");
-                        Console.WriteLine($"  - Insights count: {correlationData.Insights.Count}");
-
-                        // Force state change to render HTML
-                        StateHasChanged();
-
-                        // Wait longer for DOM to update and start chart initialization in background
-                        _ = Task.Run(async () =>
+                        await Task.Delay(1000); // Wait 1 second for DOM to be ready
+                        await InvokeAsync(async () =>
                         {
-                            await Task.Delay(1000); // Wait 1 second for DOM to be ready
-                            await InvokeAsync(async () =>
-                            {
-                                await InitializeCorrelationChart();
-                            });
+                            await InitializeCorrelationChart();
                         });
-                    }
-                    else
-                    {
-                        correlationError = "Failed to parse correlation data from API response";
-                        Console.WriteLine(correlationError);
-                    }
+                    });
                 }
                 else
                 {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    correlationError = $"API Error: {response.StatusCode} - {errorContent}";
-                    Console.WriteLine($"API Error - Status: {response.StatusCode}, Content: {errorContent}");
+                    correlationError = "Failed to parse correlation data from API response";
+                    Console.WriteLine(correlationError);
                 }
             }
-            catch (HttpRequestException httpEx)
+            else
             {
-                correlationError = $"Network error: {httpEx.Message}. Make sure the FastAPI server is running on http://localhost:8000";
-                Console.WriteLine($"HTTP Exception in LoadCorrelationData: {httpEx}");
-            }
-            catch (JsonException jsonEx)
-            {
-                correlationError = $"JSON parsing error: {jsonEx.Message}";
-                Console.WriteLine($"JSON Exception in LoadCorrelationData: {jsonEx}");
-            }
-            catch (Exception ex)
-            {
-                correlationError = $"Unexpected error: {ex.Message}";
-                Console.WriteLine($"General Exception in LoadCorrelationData: {ex}");
-            }
-            finally
-            {
-                isLoadingCorrelation = false;
-                StateHasChanged();
+                var errorContent = await response.Content.ReadAsStringAsync();
+                correlationError = $"API Error: {response.StatusCode} - {errorContent}";
+                Console.WriteLine($"API Error - Status: {response.StatusCode}, Content: {errorContent}");
             }
         }
+        catch (HttpRequestException httpEx)
+        {
+            correlationError = $"Network error: {httpEx.Message}. Make sure the FastAPI server is running on http://localhost:8000";
+            Console.WriteLine($"HTTP Exception in LoadCorrelationData: {httpEx}");
+        }
+        catch (JsonException jsonEx)
+        {
+            correlationError = $"JSON parsing error: {jsonEx.Message}";
+            Console.WriteLine($"JSON Exception in LoadCorrelationData: {jsonEx}");
+        }
+        catch (Exception ex)
+        {
+            correlationError = $"Unexpected error: {ex.Message}";
+            Console.WriteLine($"General Exception in LoadCorrelationData: {ex}");
+        }
+        finally
+        {
+            isLoadingCorrelation = false;
+            StateHasChanged();
+        }
+    }
 
         private async Task InitializeCorrelationChart()
         {
