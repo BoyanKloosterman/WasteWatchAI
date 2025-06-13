@@ -61,11 +61,16 @@ namespace WasteWatchAIBackend.Controller
 
             for (int i = 0; i < dates.Count; i++)
             {
+                DateTime timestamp = DateTime.Parse(dates[i].GetString()).ToUniversalTime();
                 float avgTemp = (maxTemps[i].GetSingle() + minTemps[i].GetSingle()) / 2;
+
+                bool exists = await _repository.WeatherExistsAsync(timestamp, request.Latitude, request.Longitude);
+                if (exists)
+                    continue;
 
                 var weather = new WeatherData
                 {
-                    Timestamp = DateTime.Parse(dates[i].GetString()).ToUniversalTime(),
+                    Timestamp = timestamp,
                     Latitude = request.Latitude,
                     Longitude = request.Longitude,
                     Temperature = avgTemp,

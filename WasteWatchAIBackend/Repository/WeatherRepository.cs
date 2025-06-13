@@ -25,6 +25,13 @@ namespace WasteWatchAIBackend.Repository
         {
             return await _context.WeatherData.OrderByDescending(w => w.Timestamp).ToListAsync();
         }
+        public async Task<bool> WeatherExistsAsync(DateTime date, double latitude, double longitude)
+        {
+            return await _context.WeatherData.AnyAsync(w =>
+                w.Timestamp.Date == date.Date &&
+                w.Latitude == latitude &&
+                w.Longitude == longitude);
+        }
 
     }
 
