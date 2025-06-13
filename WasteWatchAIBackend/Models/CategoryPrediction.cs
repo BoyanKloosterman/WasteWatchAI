@@ -1,4 +1,6 @@
-﻿namespace WasteWatchAIBackend.Models
+﻿using System.Text.Json.Serialization;
+
+namespace WasteWatchAIBackend.Models
 {
     public class CategoryPrediction
     {
@@ -10,6 +12,8 @@
 
         // Foreign key if using EF Core
         public Guid PredictionResultId { get; set; }
+
+        [JsonIgnore]
         public PredictionResult PredictionResult { get; set; }
     }
 }

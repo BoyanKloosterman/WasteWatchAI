@@ -13,21 +13,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
 import requests
 import warnings
+from fastapi import APIRouter
+
+router = APIRouter()
 
 # Suppress the specific sklearn warning
 warnings.filterwarnings("ignore", message="X has feature names, but DecisionTreeRegressor was fitted without feature names")
-
-# Maak FastAPI app EERST - net zoals in main.py
-app = FastAPI(title="Waste Prediction API", version="1.0.0")
-
-# CORS middleware - exact zoals in main.py
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Global variables voor models
 dt_models = {}
@@ -46,10 +37,13 @@ class PredictionRequest(BaseModel):
 
 class PredictionResponse(BaseModel):
     datum: str
+    latitude: float
+    longitude: float
+    temperatuur: float
+    weersverwachting: str
     predictions: Dict[str, int]
     confidence_scores: Dict[str, float]
-    model_used_per_category: Dict[str, str] = {}  # NIEUW
-    input_parameters: Dict[str, Any]
+    model_used_per_category: Dict[str, str] = {}
     data_source: str
 
 def load_data_and_train_models():
@@ -57,14 +51,27 @@ def load_data_and_train_models():
     global dt_models, rf_models, dt_r2_scores, rf_r2_scores, available_features, weather_mapping
     
     # API URLs
-    trashUrl = "http://localhost:8080/api/TrashItems/dummy"
-    weerUrl = "http://localhost:8080/api/Weather/"
+    trashUrl = "http://host.docker.internal:8080/api/TrashItems/dummy"
+    weerUrl = "http://host.docker.internal:8080/api/Weather/"
     
     try:
         print("Loading trash data...")
-        # Load trash data
-        trash = pd.read_json(trashUrl)
-        print(f"Loaded {len(trash)} trash records")
+        try:
+            print(f"Making request to: {trashUrl}")
+            response = requests.get(trashUrl, timeout=10)
+            print(f"Response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                # Convert response to DataFrame
+                trash_data = response.json()
+                trash = pd.DataFrame(trash_data)
+                print(f"✅ Loaded {len(trash)} trash records from API")
+            else:
+                raise Exception(f"API returned status {response.status_code}")
+                
+        except Exception as e:
+            print(f"❌ Error loading trash data: {e}")
+            raise e  # Re-raise om te zien wat er echt gebeurt
         
         # Convert timestamp to datetime
         trash['timestamp'] = pd.to_datetime(trash['timestamp'])
@@ -432,9 +439,9 @@ def startup_models():
         print("Models loaded successfully!")
 
 # Roep startup functie aan
-startup_models()
+# startup_models()
 
-@app.post("/api/predict", response_model=PredictionResponse)
+@router.post("/predict", response_model=PredictionResponse)
 async def predict_waste_endpoint(request: PredictionRequest):
     """Predict waste amounts using model with highest confidence per category"""
     try:
@@ -456,17 +463,13 @@ async def predict_waste_endpoint(request: PredictionRequest):
         
         return PredictionResponse(
             datum=request.datum,
+            latitude=request.latitude,
+            longitude=request.longitude,
+            weersverwachting=request.weersverwachting,
+            temperatuur=request.temperatuur,
             predictions=predictions,
             confidence_scores=confidence_scores,
             model_used_per_category=model_used_per_category,
-            input_parameters={
-                "temperatuur": request.temperatuur,
-                "weersverwachting": request.weersverwachting,
-                "latitude": request.latitude,
-                "longitude": request.longitude,
-                "avg_confidence": round(avg_confidence, 3),  # Voeg average confidence toe
-                "all_model_confidence": all_model_confidence  # Toon alle confidence scores
-            },
             data_source="TrashItems API + Weather API"
         )
         
@@ -477,50 +480,3 @@ async def predict_waste_endpoint(request: PredictionRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
-
-@app.get("/api/model-info")
-async def get_model_info():
-    """Eenvoudige model info - net zoals notebooks"""
-    try:
-        categories = ['Plastic', 'Papier', 'Organisch', 'Glas']
-        
-        # R² scores
-        dt_r2_display = {}
-        rf_r2_display = {}
-        
-        for category in categories:
-            dt_r2_display[category] = round(dt_r2_scores.get(category, 0), 3)
-            rf_r2_display[category] = round(rf_r2_scores.get(category, 0), 3)
-        
-        return {
-            "model_type": "dual_model_system",
-            "decision_tree_r2_scores": dt_r2_display,
-            "random_forest_r2_scores": rf_r2_display,
-            "decision_tree_avg_r2": round(np.mean(list(dt_r2_display.values())), 3),
-            "random_forest_avg_r2": round(np.mean(list(rf_r2_display.values())), 3),
-            "available_features": available_features,
-            "supported_weather_types": list(weather_mapping.keys()),
-            "prediction_categories": categories
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get model info: {str(e)}")
-
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint"""
-    models_loaded = len(dt_models) > 0 and len(rf_models) > 0
-    return {
-        "status": "healthy" if models_loaded else "starting",
-        "models_loaded": models_loaded,
-        "available_targets": len(dt_models),
-        "api_version": "1.0.0"
-    }
-
-@app.get("/")
-def read_root():
-    """Root endpoint - net zoals in main.py"""
-    return {"message": "Waste Prediction API is running", "version": "1.0.0"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
