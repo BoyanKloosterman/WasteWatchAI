@@ -18,6 +18,7 @@ namespace WasteWatchAIFrontend.Components.Pages
         private List<TrashItem> trashItems = new();
         private List<LocationChartData> locationChartData = new();
         private List<FrequencyDataItem> frequencyData = new();
+        private readonly Dictionary<string, string> cameraLocationCache = new();
         private bool isLoading = true;
         private string selectedPeriod = string.Empty;
         private string selectedLocation = string.Empty;
@@ -27,6 +28,7 @@ namespace WasteWatchAIFrontend.Components.Pages
         private string correlationError = string.Empty;
         private bool useDummyData = false;
         private bool chartsNeedUpdate = false;
+
 
         // Define color mapping for waste types
         private readonly Dictionary<string, string> wasteTypeColors = new()
@@ -225,37 +227,52 @@ namespace WasteWatchAIFrontend.Components.Pages
             frequencyData = hourlyFrequency;
         }
 
-        private string GetLocationName(float latitude, float longitude)
+      private string GetLocationName(float latitude, float longitude)
+{
+    if (!useDummyData)
+    {
+        var roundedLat = Math.Round(latitude, 4);
+        var roundedLon = Math.Round(longitude, 4);
+        var locationKey = $"{roundedLat},{roundedLon}";
+        
+        if (!cameraLocationCache.ContainsKey(locationKey))
         {
-            // Breda: Grote Markt (updated range)
-            if (latitude >= 51.5890 && latitude <= 51.5900 && longitude >= 4.7750 && longitude <= 4.7765)
-                return "Grote Markt Breda";
-
-            // Breda: Centraal Station
-            if (latitude >= 51.5953 && latitude <= 51.5963 && longitude >= 4.7787 && longitude <= 4.7797)
-                return "Centraal Station Breda";
-
-            // Breda: Valkenberg Park
-            if (latitude >= 51.5929 && latitude <= 51.5939 && longitude >= 4.7791 && longitude <= 4.7801)
-                return "Valkenberg Park";
-
-            // Breda: Haagdijk (updated range)
-            if (latitude >= 51.5920 && latitude <= 51.5925 && longitude >= 4.7685 && longitude <= 4.7695)
-                return "Haagdijk";
-
-            // Breda: Chassé Park (new)
-            if (latitude >= 51.5860 && latitude <= 51.5866 && longitude >= 4.7848 && longitude <= 4.7856)
-                return "Chassé Park";
-
-            // Breda: Chasséveld (existing)
-            if (latitude >= 51.5890 && latitude <= 51.5902 && longitude >= 4.7750 && longitude <= 4.7766)
-                return "Chasséveld";
-
-            // Default locations for other coordinates
-            var random = new Random((int)(latitude * 1000 + longitude * 1000));
-            var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
-            return locations[random.Next(locations.Length)];
+            var cameraNumber = cameraLocationCache.Count + 1;
+            cameraLocationCache[locationKey] = $"Camera {cameraNumber}";
         }
+        
+        return cameraLocationCache[locationKey];
+    }
+
+    // Breda: Grote Markt (updated range)
+    if (latitude >= 51.5890 && latitude <= 51.5900 && longitude >= 4.7750 && longitude <= 4.7765)
+        return "Grote Markt Breda";
+
+    // Breda: Centraal Station
+    if (latitude >= 51.5953 && latitude <= 51.5963 && longitude >= 4.7787 && longitude <= 4.7797)
+        return "Centraal Station Breda";
+
+    // Breda: Valkenberg Park
+    if (latitude >= 51.5929 && latitude <= 51.5939 && longitude >= 4.7791 && longitude <= 4.7801)
+        return "Valkenberg Park";
+
+    // Breda: Haagdijk (updated range)
+    if (latitude >= 51.5920 && latitude <= 51.5925 && longitude >= 4.7685 && longitude <= 4.7695)
+        return "Haagdijk";
+
+    // Breda: Chassé Park (new)
+    if (latitude >= 51.5860 && latitude <= 51.5866 && longitude >= 4.7848 && longitude <= 4.7856)
+        return "Chassé Park";
+
+    // Breda: Chasséveld (existing)
+    if (latitude >= 51.5890 && latitude <= 51.5902 && longitude >= 4.7750 && longitude <= 4.7766)
+        return "Chasséveld";
+
+    // Default locations for other dummy coordinates
+    var random = new Random((int)(latitude * 1000 + longitude * 1000));
+    var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
+    return locations[random.Next(locations.Length)];
+}
 
         private string GetDayAbbreviation(DayOfWeek day)
         {
