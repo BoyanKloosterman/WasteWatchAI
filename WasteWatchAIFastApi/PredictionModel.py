@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import pickle
 import os
+from datetime import datetime, timedelta
 from typing import Dict, Any
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
@@ -30,8 +31,6 @@ weather_mapping = {}
 
 class PredictionRequest(BaseModel):
     datum: str  # Format: "YYYY-MM-DD"
-    temperatuur: float
-    weersverwachting: str
     latitude: float = 51.5890  # Default voor Breda centrum
     longitude: float = 4.7750  # Default voor Breda centrum
 
@@ -41,10 +40,136 @@ class PredictionResponse(BaseModel):
     longitude: float
     temperatuur: float
     weersverwachting: str
+    weather_source: str  # Nieuw: toont bron van weather data
     predictions: Dict[str, int]
     confidence_scores: Dict[str, float]
     model_used_per_category: Dict[str, str] = {}
     data_source: str
+
+
+def get_weather_from_openmeteo(date_str: str, latitude: float, longitude: float):
+    """Haal weer data op van OpenMeteo API voor specifieke datum en locatie"""
+    try:
+        # Parse datum
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        today = datetime.now().date()
+        
+        # Bepaal of het historische data of forecast is
+        if target_date <= today:
+            # Historische data
+            api_url = "https://archive-api.open-meteo.com/v1/archive"
+        else:
+            # Forecast data
+            api_url = "https://api.open-meteo.com/v1/forecast"
+        
+        # API parameters
+        params = {
+            'latitude': latitude,
+            'longitude': longitude,
+            'start_date': date_str,
+            'end_date': date_str,
+            'daily': 'temperature_2m_mean,weather_code',
+            'timezone': 'Europe/Amsterdam'
+        }
+        
+        print(f"🌤️ Fetching weather for {date_str} from OpenMeteo...")
+        response = requests.get(api_url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"🔍 OpenMeteo response: {data}")  # Debug log
+            
+            if 'daily' in data and data['daily']['time']:
+                # Pak eerste (en enige) dag
+                temperature = data['daily']['temperature_2m_mean'][0] if data['daily']['temperature_2m_mean'] else None
+                weather_code = data['daily']['weather_code'][0] if data['daily']['weather_code'] else None
+                
+                # Valideer dat we echte data hebben
+                if temperature is None or weather_code is None:
+                    raise Exception(f"OpenMeteo returned None values: temp={temperature}, code={weather_code}")
+                
+                # Extra validatie voor realistische temperatuur
+                if not isinstance(temperature, (int, float)) or temperature < -50 or temperature > 60:
+                    raise Exception(f"Invalid temperature value: {temperature}")
+                
+                # Map weather code to Dutch description
+                weather_description = map_weather_code_to_description(weather_code)
+                
+                print(f"✅ Weather data: {temperature}°C, {weather_description}")
+                
+                return {
+                    'temperatuur': round(float(temperature), 1),
+                    'weersverwachting': weather_description,
+                    'weather_source': 'OpenMeteo API'
+                }
+            else:
+                raise Exception(f"Invalid OpenMeteo response structure: {data}")
+        else:
+            raise Exception(f"OpenMeteo API returned status {response.status_code}: {response.text}")
+            
+    except Exception as e:
+        print(f"❌ OpenMeteo API failed: {e}")
+        
+        # Fallback naar seizoensgemiddelden voor Nederland
+        month = datetime.strptime(date_str, '%Y-%m-%d').month
+        
+        # Nederlandse seizoensgemiddelden
+        if month in [12, 1, 2]:  # Winter
+            fallback_temp = 5.0
+            fallback_weather = 'Bewolkt'
+        elif month in [3, 4, 5]:  # Lente
+            fallback_temp = 12.0
+            fallback_weather = 'Gedeeltelijk bewolkt'
+        elif month in [6, 7, 8]:  # Zomer
+            fallback_temp = 20.0
+            fallback_weather = 'Zonnig'
+        else:  # Herfst
+            fallback_temp = 12.0
+            fallback_weather = 'Regenachtig'
+        
+        print(f"🔄 Using fallback weather: {fallback_temp}°C, {fallback_weather}")
+        
+        return {
+            'temperatuur': fallback_temp,
+            'weersverwachting': fallback_weather,
+            'weather_source': 'Fallback (seasonal average)'
+        }
+
+def map_weather_code_to_description(weather_code):
+    """Map OpenMeteo weather codes to Dutch descriptions"""
+    weather_code_mapping = {
+        0: 'Zonnig',
+        1: 'Gedeeltelijk bewolkt',
+        2: 'Gedeeltelijk bewolkt', 
+        3: 'Bewolkt',
+        45: 'Mistig',
+        48: 'Mistig',
+        51: 'Lichte motregen',
+        53: 'Motregen',
+        55: 'Motregen',
+        56: 'Ijzel',
+        57: 'Ijzel',
+        61: 'Lichte regen',
+        63: 'Regen',
+        65: 'Zware regen',
+        66: 'Ijzel',
+        67: 'Ijzel',
+        71: 'Lichte sneeuw',
+        73: 'Sneeuw',
+        75: 'Zware sneeuw',
+        77: 'Hagel',
+        80: 'Lichte buien',
+        81: 'Buien',
+        82: 'Zware buien',
+        85: 'Sneeuwbuien',
+        86: 'Sneeuwbuien',
+        95: 'Onweer',
+        96: 'Onweer met hagel',
+        99: 'Zwaar onweer'
+    }
+    
+    return weather_code_mapping.get(weather_code, 'Bewolkt')
+
 
 def load_data_and_train_models():
     """Load data and train both Decision Tree and Random Forest models"""
@@ -346,9 +471,13 @@ def calculate_prediction_confidence(model, input_data, target_name):
         print(f"Error calculating confidence for {target_name}: {e}")
         return 0.3
 
-def predict_waste(date_str: str, latitude: float, longitude: float, 
-                 temperatuur: float, weersverwachting: str):
-    """Eenvoudige voorspelling - net zoals in notebooks"""
+def predict_waste(date_str: str, latitude: float, longitude: float):
+    """Voorspel afval voor specifieke datum en locatie (weer wordt automatisch opgehaald)"""
+    
+    # Haal weer data op van OpenMeteo
+    weather_data = get_weather_from_openmeteo(date_str, latitude, longitude)
+    temperatuur = weather_data['temperatuur']
+    weersverwachting = weather_data['weersverwachting']
     
     # Convert date string to datetime
     date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -372,7 +501,7 @@ def predict_waste(date_str: str, latitude: float, longitude: float,
     # Map weather description to numeric
     weersverwachting_num = weather_mapping.get(weersverwachting, 1)
     
-    # Create input data - net zoals in notebooks
+    # Create input data
     input_values = np.array([[
         latitude, longitude, year, month, day, weekday,
         temperatuur, weersverwachting_num, is_weekend, seizoen
@@ -385,7 +514,7 @@ def predict_waste(date_str: str, latitude: float, longitude: float,
     model_used_per_category = {}
     
     for category in categories:
-        # Gebruik altijd Random Forest als beschikbaar (zoals in notebooks)
+        # Gebruik Random Forest als beschikbaar, anders Decision Tree
         if category in rf_models:
             model = rf_models[category]
             model_type = "random_forest"
@@ -417,11 +546,13 @@ def predict_waste(date_str: str, latitude: float, longitude: float,
     # Calculate overall confidence
     avg_confidence = np.mean(list(confidence_scores.values())) if confidence_scores else 0
     
-    # Overall model gebruikt (meestal RF)
+    # Overall model gebruikt
     model_types = list(model_used_per_category.values())
     overall_model = "random_forest" if "random_forest" in model_types else "mixed"
     
-    return predictions, confidence_scores, {}, overall_model, avg_confidence, model_used_per_category
+    # Return predictions + weather data
+    return (predictions, confidence_scores, {}, overall_model, avg_confidence, 
+            model_used_per_category, weather_data)
 
 def get_best_model_type():
     """Eenvoudige best model bepaling"""
@@ -443,7 +574,7 @@ def startup_models():
 
 @router.post("/predict", response_model=PredictionResponse)
 async def predict_waste_endpoint(request: PredictionRequest):
-    """Predict waste amounts using model with highest confidence per category"""
+    """Predict waste amounts - weather data wordt automatisch opgehaald van OpenMeteo"""
     try:
         # Validate date format
         datetime.strptime(request.datum, '%Y-%m-%d')
@@ -452,21 +583,20 @@ async def predict_waste_endpoint(request: PredictionRequest):
         if not dt_models and not rf_models:
             raise HTTPException(status_code=503, detail="Models not loaded yet")
         
-        # Make prediction with highest confidence model per category
-        predictions, confidence_scores, all_model_confidence, model_used, avg_confidence, model_used_per_category = predict_waste(
+        # Make prediction (weather wordt automatisch opgehaald)
+        predictions, confidence_scores, all_model_confidence, model_used, avg_confidence, model_used_per_category, weather_data = predict_waste(
             request.datum,
             request.latitude,
-            request.longitude,
-            request.temperatuur,
-            request.weersverwachting
+            request.longitude
         )
         
         return PredictionResponse(
             datum=request.datum,
             latitude=request.latitude,
             longitude=request.longitude,
-            weersverwachting=request.weersverwachting,
-            temperatuur=request.temperatuur,
+            temperatuur=weather_data['temperatuur'],
+            weersverwachting=weather_data['weersverwachting'],
+            weather_source=weather_data['weather_source'],
             predictions=predictions,
             confidence_scores=confidence_scores,
             model_used_per_category=model_used_per_category,
