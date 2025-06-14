@@ -6,9 +6,10 @@
         public DateTime Timestamp { get; set; }
         public float Latitude { get; set; }
         public float Longitude { get; set; }
-        public string Prediction { get; set; }
-        public string FeatureWeather { get; set; }
-        public float FeatureTemp { get; set; }
-        public string FeatureLocationType { get; set; }
+        public string Weather { get; set; }
+        public float Temp { get; set; }
+        public float AvgConfidence { get; set; }
+
+        public List<CategoryPrediction> Predictions { get; set; }
     }
 }
