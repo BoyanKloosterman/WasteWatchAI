@@ -14,9 +14,13 @@ namespace WasteWatchAIFrontend.Components.Pages
         [Inject] private IJSRuntime JS { get; set; } = default!;
 
         // State variables
+        private List<TrashItem> filteredTrashItems = new();
         private List<TrashItem> trashItems = new();
         private List<LocationChartData> locationChartData = new();
         private List<FrequencyDataItem> frequencyData = new();
+        private readonly Dictionary<string, string> cameraLocationCache = new();
+        private readonly Dictionary<string, string> locationCache = new();
+
         private bool isLoading = true;
         private string selectedPeriod = string.Empty;
         private string selectedLocation = string.Empty;
@@ -26,8 +30,10 @@ namespace WasteWatchAIFrontend.Components.Pages
         private string correlationError = string.Empty;
         private bool useDummyData = false;
         private bool chartsNeedUpdate = false;
-
-        // Define color mapping for waste types
+        private bool isDataModeChanging = false;
+        private List<string> availableLocations = new();
+        private int currentDisplayCount = 0; 
+        private string selectedFrequencyDay = string.Empty; 
         private readonly Dictionary<string, string> wasteTypeColors = new()
         {
             { "Plastic", "#e74c3c" },      // Red
@@ -43,6 +49,13 @@ namespace WasteWatchAIFrontend.Components.Pages
             else
                 await LoadRealTrashData();
 
+            // Pre-load detailed locations for real data
+            if (!useDummyData && trashItems.Any())
+            {
+                await PreloadLocationNames();
+            }
+
+            currentDisplayCount = trashItems.Count; // Initialize display count
             await ProcessData();
             await LoadCorrelationData();
         }
@@ -65,6 +78,7 @@ namespace WasteWatchAIFrontend.Components.Pages
             finally
             {
                 isLoading = false;
+                UpdateAvailableLocations();
                 await ProcessData();
                 chartsNeedUpdate = true;
                 StateHasChanged();
@@ -92,6 +106,7 @@ namespace WasteWatchAIFrontend.Components.Pages
             finally
             {
                 isLoading = false;
+                UpdateAvailableLocations(); 
                 await ProcessData();
                 StateHasChanged();
                 chartsNeedUpdate = true;
@@ -101,7 +116,15 @@ namespace WasteWatchAIFrontend.Components.Pages
         private async Task ToggleDataMode()
         {
             isLoading = true;
+            isDataModeChanging = true; 
             StateHasChanged();
+
+            // Reset filters when switching data mode
+            ResetFiltersWithoutProcessing();
+
+            // Clear location caches when switching modes
+            cameraLocationCache.Clear();
+            locationCache.Clear();
 
             if (useDummyData)
                 await LoadDummyTrashData();
@@ -109,6 +132,8 @@ namespace WasteWatchAIFrontend.Components.Pages
                 await LoadRealTrashData();
 
             await LoadCorrelationData();
+
+            isDataModeChanging = false; // Reset flag after mode change is complete
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -206,13 +231,40 @@ namespace WasteWatchAIFrontend.Components.Pages
 
             locationChartData = locationGroups;
 
-            // Process frequency data - count by hour of day
-            var hourlyFrequency = new List<FrequencyDataItem>();
+            // Process frequency data - filter by selected day if specified
+            await ProcessFrequencyData();
+        }
+        
+        // Add new method for processing frequency data
+        private async Task ProcessFrequencyData()
+        {
+            var itemsToAnalyze = HasActiveFilters() ? filteredTrashItems : trashItems;
+            
+            // Filter by selected day if specified
+            if (!string.IsNullOrEmpty(selectedFrequencyDay))
+            {
+                if (selectedFrequencyDay == "today")
+                {
+                    itemsToAnalyze = itemsToAnalyze.Where(item => item.Timestamp.Date == DateTime.Today).ToList();
+                }
+                else if (selectedFrequencyDay == "yesterday")
+                {
+                    itemsToAnalyze = itemsToAnalyze.Where(item => item.Timestamp.Date == DateTime.Today.AddDays(-1)).ToList();
+                }
+                else if (selectedFrequencyDay.StartsWith("day_"))
+                {
+                    // For specific days back (day_1, day_2, etc.)
+                    var daysBack = int.Parse(selectedFrequencyDay.Replace("day_", ""));
+                    var targetDate = DateTime.Today.AddDays(-daysBack);
+                    itemsToAnalyze = itemsToAnalyze.Where(item => item.Timestamp.Date == targetDate).ToList();
+                }
+            }
 
             // Create hourly buckets from 06:00 to 22:00
+            var hourlyFrequency = new List<FrequencyDataItem>();
             for (int hour = 6; hour <= 22; hour++)
             {
-                var count = trashItems.Count(item => item.Timestamp.Hour == hour);
+                var count = itemsToAnalyze.Count(item => item.Timestamp.Hour == hour);
                 hourlyFrequency.Add(new FrequencyDataItem
                 {
                     Label = $"{hour:D2}:00",
@@ -223,9 +275,53 @@ namespace WasteWatchAIFrontend.Components.Pages
 
             frequencyData = hourlyFrequency;
         }
+        
+        private async Task OnFrequencyFilterChanged()
+        {
+            await ProcessFrequencyData();
+            StateHasChanged();
+            await InitializeFrequencyChart();
+        }
+        
+        private void UpdateAvailableLocations()
+        {
+            // Always use the original unfiltered trashItems for available locations
+            availableLocations = trashItems
+                .Select(item => GetLocationName(item.Latitude, item.Longitude))
+                .Distinct()
+                .OrderBy(loc => loc)
+                .ToList();
+        }
 
         private string GetLocationName(float latitude, float longitude)
         {
+            if (!useDummyData)
+            {
+                var roundedLat = Math.Round(latitude, 4);
+                var roundedLon = Math.Round(longitude, 4);
+                var locationKey = $"{roundedLat},{roundedLon}";
+
+                if (!cameraLocationCache.ContainsKey(locationKey))
+                {
+                    var cameraNumber = cameraLocationCache.Count + 1;
+
+                    // Check if we have detailed location in cache
+                    if (locationCache.ContainsKey(locationKey))
+                    {
+                        var detailedLocation = locationCache[locationKey];
+                        cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+                    }
+                    else
+                    {
+                        // Use improved fallback while API loads
+                        var detailedLocation = GetImprovedLocationFallback(latitude, longitude);
+                        cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+                    }
+                }
+
+                return cameraLocationCache[locationKey];
+            }
+
             // Breda: Grote Markt (updated range)
             if (latitude >= 51.5890 && latitude <= 51.5900 && longitude >= 4.7750 && longitude <= 4.7765)
                 return "Grote Markt Breda";
@@ -250,10 +346,54 @@ namespace WasteWatchAIFrontend.Components.Pages
             if (latitude >= 51.5890 && latitude <= 51.5902 && longitude >= 4.7750 && longitude <= 4.7766)
                 return "Chasséveld";
 
-            // Default locations for other coordinates
+            // Default locations for other dummy coordinates
             var random = new Random((int)(latitude * 1000 + longitude * 1000));
             var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
             return locations[random.Next(locations.Length)];
+        }
+
+        private string GetImprovedLocationFallback(float latitude, float longitude)
+        {
+            // Chasséveld Breda (51.58894, 4.78522)
+            if (latitude >= 51.588 && latitude <= 51.590 && longitude >= 4.784 && longitude <= 4.786)
+                return "Chasséveld, Breda";
+
+            // Grote Markt Breda
+            if (latitude >= 51.588 && latitude <= 51.591 && longitude >= 4.774 && longitude <= 4.777)
+                return "Grote Markt, Centrum, Breda";
+
+            // Centraal Station Breda
+            if (latitude >= 51.595 && latitude <= 51.597 && longitude >= 4.778 && longitude <= 4.780)
+                return "Stationsplein, Breda Centraal";
+
+            // Valkenberg Park
+            if (latitude >= 51.592 && latitude <= 51.595 && longitude >= 4.778 && longitude <= 4.781)
+                return "Valkenberg Park, Breda";
+
+            // Haagdijk
+            if (latitude >= 51.591 && latitude <= 51.594 && longitude >= 4.767 && longitude <= 4.770)
+                return "Haagdijk, Breda";
+
+            // Chassé Park
+            if (latitude >= 51.585 && latitude <= 51.587 && longitude >= 4.784 && longitude <= 4.786)
+                return "Chassé Park, Breda";
+
+            // Broader Breda area
+            if (latitude >= 51.55 && latitude <= 51.62 && longitude >= 4.73 && longitude <= 4.82)
+                return "Breda";
+
+            // Other major Dutch cities with more precise ranges
+            if (latitude >= 52.35 && latitude <= 52.38 && longitude >= 4.88 && longitude <= 4.92)
+                return "Amsterdam Centrum";
+
+            if (latitude >= 51.91 && latitude <= 51.93 && longitude >= 4.46 && longitude <= 4.49)
+                return "Rotterdam Centrum";
+
+            if (latitude >= 52.06 && latitude <= 52.08 && longitude >= 4.29 && longitude <= 4.32)
+                return "Den Haag Centrum";
+
+            // Use more precise coordinates in fallback
+            return $"Nederland ({Math.Round(latitude, 3)}, {Math.Round(longitude, 3)})";
         }
 
         private string GetDayAbbreviation(DayOfWeek day)
@@ -330,8 +470,20 @@ namespace WasteWatchAIFrontend.Components.Pages
                 parts.Add("alle categorieën");
             }
 
+            // Add item count if filters are active
+            if (HasActiveFilters())
+            {
+                var itemCount = filteredTrashItems?.Count ?? 0;
+                parts.Add($"({itemCount} items)");
+            }
+            else
+            {
+                parts.Add($"({trashItems.Count} items)");
+            }
+
             return string.Join(", ", parts);
         }
+
 
         private async Task ApplyFilters()
         {
@@ -352,12 +504,12 @@ namespace WasteWatchAIFrontend.Components.Pages
             if (!string.IsNullOrEmpty(selectedCategory))
             {
                 var categoryMap = new Dictionary<string, string>
-                {
-                    { "plastic", "Plastic" },
-                    { "papier", "Papier" },
-                    { "gft", "Organisch" },
-                    { "glas", "Glas" }
-                };
+            {
+                { "plastic", "Plastic" },
+                { "papier", "Papier" },
+                { "gft", "Organisch" },
+                { "glas", "Glas" }
+            };
 
                 if (categoryMap.TryGetValue(selectedCategory, out var actualCategory))
                 {
@@ -372,33 +524,67 @@ namespace WasteWatchAIFrontend.Components.Pages
                     GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase));
             }
 
+            // Store filtered items for correlation analysis
+            filteredTrashItems = filteredItems.ToList();
+
+            // Update current display count
+            currentDisplayCount = filteredTrashItems.Count;
+
+            // Update charts with filtered items WITHOUT changing availableLocations
             var originalItems = trashItems;
-            trashItems = filteredItems.ToList();
+            trashItems = filteredTrashItems;
 
             await ProcessData();
+
+            // Reload correlation data with filtered items
+            await LoadCorrelationData();
+
+            // Restore original items
             trashItems = originalItems;
 
             StateHasChanged();
             await InitializeCharts();
         }
 
-        // New method for handling filter changes
-        private async Task OnFilterChanged()
+        // Updated method for resetting filters
+        private async Task ResetFilters()
         {
+            ResetFiltersWithoutProcessing();
+            currentDisplayCount = trashItems.Count; // Reset to total count
             await ApplyFilters();
         }
 
-        // New method for resetting filters
-        private async Task ResetFilters()
+        // New helper method to get display count
+        private int GetDisplayItemCount()
+        {
+            if (HasActiveFilters())
+            {
+                return currentDisplayCount;
+            }
+            return trashItems.Count;
+        }
+
+        private async Task OnFilterChanged()
+        {
+            // Only check if selected location exists when changing data modes
+            if (isDataModeChanging && !string.IsNullOrEmpty(selectedLocation) && !availableLocations.Contains(selectedLocation))
+            {
+                selectedLocation = string.Empty;
+            }
+
+            await ApplyFilters();
+        }
+
+
+
+        private void ResetFiltersWithoutProcessing()
         {
             selectedPeriod = string.Empty;
             selectedLocation = string.Empty;
             selectedCategory = string.Empty;
-
-            await ApplyFilters();
+            selectedFrequencyDay = string.Empty; // Add this line
         }
-
-        // Helper method to check if any filters are active
+        
         private bool HasActiveFilters()
         {
             return !string.IsNullOrEmpty(selectedPeriod) ||
@@ -430,8 +616,11 @@ namespace WasteWatchAIFrontend.Components.Pages
                 Console.WriteLine("Starting correlation data load...");
                 var httpClient = HttpClientFactory.CreateClient();
 
-                // Prepare trash items data (use dummy or real based on toggle)
-                var trashItemsToSend = trashItems
+                // Use filtered items if filters are active, otherwise use all items
+                var itemsToAnalyze = HasActiveFilters() ? filteredTrashItems : trashItems;
+
+                // Prepare trash items data (use filtered or all data based on filters)
+                var trashItemsToSend = itemsToAnalyze
                     .Select(item => new
                     {
                         id = item.Id.ToString(),
@@ -441,17 +630,25 @@ namespace WasteWatchAIFrontend.Components.Pages
                         timestamp = item.Timestamp
                     }).ToList();
 
-                Console.WriteLine($"Sending {trashItemsToSend.Count} trash items to API");
+                Console.WriteLine($"Sending {trashItemsToSend.Count} trash items to API (filtered: {HasActiveFilters()})");
+
+                var daysBack = selectedPeriod switch
+                {
+                    "week" => 7,
+                    "month" => 31,
+                    "year" => 365,
+                    _ => 31
+                };
 
                 var requestData = new
                 {
                     trash_items = trashItemsToSend,
                     latitude = 51.5912, // Breda coordinates
                     longitude = 4.7761,
-                    days_back = 30
+                    days_back = daysBack
                 };
 
-                Console.WriteLine("Making API request...");
+                Console.WriteLine($"Making API request with {daysBack} days back...");
                 var response = await httpClient.PostAsJsonAsync("http://localhost:8000/api/correlation/analyze", requestData);
 
                 Console.WriteLine($"API Response status: {response.StatusCode}");
@@ -477,9 +674,8 @@ namespace WasteWatchAIFrontend.Components.Pages
                         Console.WriteLine($"  - Sunny: {correlationData.SunnyWeatherPercentage}%");
                         Console.WriteLine($"  - Rainy: {correlationData.RainyWeatherPercentage}%");
                         Console.WriteLine($"  - Temperature data points: {correlationData.ChartData.TemperatureData.Temperature.Count}");
-                        Console.WriteLine($"  - Weather distribution labels: {correlationData.ChartData.WeatherDistribution.Labels.Count}");
-                        Console.WriteLine($"  - Correlation scatter points: {correlationData.ChartData.CorrelationScatter.Temperature.Count}");
                         Console.WriteLine($"  - Insights count: {correlationData.Insights.Count}");
+                        Console.WriteLine($"  - Using filtered data: {HasActiveFilters()}");
 
                         // Force state change to render HTML
                         StateHasChanged();
@@ -653,6 +849,155 @@ namespace WasteWatchAIFrontend.Components.Pages
             {
                 Console.WriteLine($"Error initializing correlation charts: {ex.Message}");
             }
+        }
+
+        private async Task<string> GetDetailedLocationAsync(float latitude, float longitude)
+        {
+            var locationKey = $"{Math.Round(latitude, 4)},{Math.Round(longitude, 4)}";
+
+            // Check cache first
+            if (locationCache.ContainsKey(locationKey))
+                return locationCache[locationKey];
+
+            try
+            {
+                using var httpClient = HttpClientFactory.CreateClient();
+                httpClient.DefaultRequestHeaders.Add("User-Agent", "WasteWatchAI/1.0");
+
+                // Use higher precision for the API call
+                var url = $"https://nominatim.openstreetmap.org/reverse?format=json&lat={latitude:F5}&lon={longitude:F5}&addressdetails=1&zoom=18";
+
+                var response = await httpClient.GetStringAsync(url);
+                var data = JsonSerializer.Deserialize<JsonElement>(response);
+
+                if (!data.TryGetProperty("address", out var address))
+                {
+                    var fallback = GetImprovedLocationFallback(latitude, longitude);
+                    locationCache[locationKey] = fallback;
+                    return fallback;
+                }
+
+                // Build detailed location string
+                var locationParts = new List<string>();
+
+                // Add street info (prioritize road over other types)
+                if (address.TryGetProperty("road", out var road))
+                {
+                    var streetName = road.GetString();
+                    if (address.TryGetProperty("house_number", out var houseNumber))
+                        locationParts.Add($"{streetName} {houseNumber.GetString()}");
+                    else
+                        locationParts.Add(streetName);
+                }
+                else if (address.TryGetProperty("pedestrian", out var pedestrian))
+                {
+                    locationParts.Add(pedestrian.GetString());
+                }
+                else if (address.TryGetProperty("amenity", out var amenity))
+                {
+                    locationParts.Add(amenity.GetString());
+                }
+                else if (address.TryGetProperty("leisure", out var leisure))
+                {
+                    locationParts.Add(leisure.GetString());
+                }
+
+                // Add neighborhood/suburb
+                if (address.TryGetProperty("neighbourhood", out var neighbourhood))
+                    locationParts.Add(neighbourhood.GetString());
+                else if (address.TryGetProperty("suburb", out var suburb))
+                    locationParts.Add(suburb.GetString());
+                else if (address.TryGetProperty("quarter", out var quarter))
+                    locationParts.Add(quarter.GetString());
+
+                // Add city
+                string city = null;
+                if (address.TryGetProperty("city", out var cityProp))
+                    city = cityProp.GetString();
+                else if (address.TryGetProperty("town", out var town))
+                    city = town.GetString();
+                else if (address.TryGetProperty("village", out var village))
+                    city = village.GetString();
+                else if (address.TryGetProperty("municipality", out var municipality))
+                    city = municipality.GetString();
+
+                if (!string.IsNullOrEmpty(city))
+                    locationParts.Add(city);
+
+                // Combine parts intelligently
+                var result = string.Join(", ", locationParts.Where(p => !string.IsNullOrEmpty(p)).Distinct());
+
+                if (string.IsNullOrEmpty(result))
+                    result = GetImprovedLocationFallback(latitude, longitude);
+
+                locationCache[locationKey] = result;
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting detailed location: {ex.Message}");
+                var fallback = GetImprovedLocationFallback(latitude, longitude);
+                locationCache[locationKey] = fallback;
+                return fallback;
+            }
+        }
+
+        // Update PreloadLocationNames to update camera cache after API calls
+        private async Task PreloadLocationNames()
+        {
+            var uniqueCoordinates = trashItems
+                .Select(item => new { item.Latitude, item.Longitude })
+                .Distinct()
+                .ToList();
+
+            foreach (var coord in uniqueCoordinates)
+            {
+                try
+                {
+                    var detailedLocation = await GetDetailedLocationAsync(coord.Latitude, coord.Longitude);
+
+                    // Update camera cache with detailed location
+                    var roundedLat = Math.Round(coord.Latitude, 4);
+                    var roundedLon = Math.Round(coord.Longitude, 4);
+                    var locationKey = $"{roundedLat},{roundedLon}";
+
+                    // Find existing camera entry and update it
+                    var existingCamera = cameraLocationCache.FirstOrDefault(kvp => kvp.Key == locationKey);
+                    if (!existingCamera.Equals(default(KeyValuePair<string, string>)))
+                    {
+                        var cameraNumber = existingCamera.Value.Split(' ')[1]; 
+                        cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
+                    }
+
+                    // Small delay to be respectful to the API
+                    await Task.Delay(200);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error preloading location for {coord.Latitude}, {coord.Longitude}: {ex.Message}");
+                }
+            }
+
+            // Trigger UI update after all locations are loaded
+            StateHasChanged();
+        }
+        private string GetFrequencyFilterSummary()
+        {
+            if (string.IsNullOrEmpty(selectedFrequencyDay))
+                return "alle dagen";
+                
+            return selectedFrequencyDay switch
+            {
+                "today" => "vandaag",
+                "yesterday" => "gisteren", 
+                "day_2" => "2 dagen geleden",
+                "day_3" => "3 dagen geleden",
+                "day_4" => "4 dagen geleden",
+                "day_5" => "5 dagen geleden",
+                "day_6" => "6 dagen geleden",
+                "day_7" => "7 dagen geleden",
+                _ => selectedFrequencyDay
+            };
         }
     }
 }
