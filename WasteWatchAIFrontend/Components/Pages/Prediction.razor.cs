@@ -11,7 +11,12 @@ namespace WasteWatchAIFrontend.Components.Pages
         [Inject] private IJSRuntime JS { get; set; } = default!;
 
         private PredictionResponse predictionResult = new();
-        private DateTime? selectedDate = DateTime.Today;
+
+
+        private DateTime ?selectedDate = DateTime.UtcNow.AddDays(1);
+        private DateTime minDate = DateTime.Today.AddDays(1);      
+        private DateTime maxDate = DateTime.Today.AddDays(14);
+
         private bool isLoading = false;
         private bool useDummyData = false;
         private bool chartsNeedUpdate = false;

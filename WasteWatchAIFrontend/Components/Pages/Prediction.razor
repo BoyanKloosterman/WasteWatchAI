@@ -22,7 +22,14 @@
                     </p>
                     <div class="mb-3">
                         <label for="datePicker" class="form-label">Selecteer een datum:</label>
-                        <InputDate id="datePicker" @bind-Value="selectedDate" class="form-control" />
+                        <InputDate @bind-Value="selectedDate"
+                           AdditionalAttributes="@(new Dictionary<string, object>
+                           {
+                               { "id", "datePicker" },
+                               { "class", "form-control" },
+                               { "min", minDate.ToString("yyyy-MM-dd") },
+                               { "max", maxDate.ToString("yyyy-MM-dd") }
+                           })" />
                     </div>
 
                     <button @onclick="HandlePrediction" class="btn btn-primary" type="button" disabled="@isLoading">

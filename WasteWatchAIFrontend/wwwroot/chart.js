@@ -100,7 +100,20 @@ window.initializePredictionChart = function (chartData) {
                         text: chartData.datasets[0]?.label || 'Voorspelde afvalitems'
                     },
                     legend: {
-                        display: true // Hide legend to show individual bars
+                        labels: {
+                            generateLabels: function (chart) {
+                                const dataset = chart.data.datasets[0];
+                                return chart.data.labels.map((label, i) => {
+                                    return {
+                                        text: label,
+                                        fillStyle: dataset.backgroundColor[i],
+                                        strokeStyle: dataset.borderColor[i],
+                                        lineWidth: dataset.borderWidth,
+                                        index: i
+                                    };
+                                });
+                            }
+                        }
                     },
                     tooltip: {
                         callbacks: {
