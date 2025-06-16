@@ -23,10 +23,6 @@ namespace WasteWatchAIFrontend.Components.Pages
             return "bg-danger";
         }
 
-        protected override async Task OnInitializedAsync()
-        {
-        }
-
         private async Task HandlePrediction()
         {
             if (selectedDate is null) return;
@@ -51,7 +47,7 @@ namespace WasteWatchAIFrontend.Components.Pages
                 {
                     predictionResult = await response.Content.ReadFromJsonAsync<PredictionResponse>();
                     StateHasChanged();
-                    await InitializeTypeDistributionChart();
+                    await InitializePredictionChart();
                 }
                 else
                 {
@@ -88,10 +84,10 @@ namespace WasteWatchAIFrontend.Components.Pages
         private async Task InitializeCharts()
         {
             // Check if we're showing prediction results or initializing an empty chart
-            InitializeTypeDistributionChart();
+            InitializePredictionChart();
         }
 
-        private async Task InitializeTypeDistributionChart()
+        private async Task InitializePredictionChart()
         {
             try
             {

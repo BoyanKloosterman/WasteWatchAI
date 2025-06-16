@@ -62,16 +62,16 @@ window.initializeTypeDistributionChart = function (chartData) {
     }
 };
 
-// Prediction Chart
+// Prediction Chart - Fixed implementation
 window.initializePredictionChart = function (chartData) {
+    // Debug logging
+    console.log('initializePredictionChart called with data:', JSON.stringify(chartData, null, 2));
+
     const ctx = document.getElementById('predictionChart');
     if (!ctx) {
         console.error('predictionChart canvas element not found');
         return;
     }
-
-    // Log the chart data we received to debug
-    console.log('Chart data received:', JSON.stringify(chartData, null, 2));
 
     // Destroy chart if no data
     if (!chartData || !chartData.labels || chartData.labels.length === 0) {
@@ -95,21 +95,69 @@ window.initializePredictionChart = function (chartData) {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    title: { display: false },
-                    legend: { display: true, position: 'top' }
+                    title: {
+                        display: true,
+                        text: chartData.datasets[0]?.label || 'Voorspelde afvalitems'
+                    },
+                    legend: {
+                        display: true // Hide legend to show individual bars
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function (tooltipItems) {
+                                return tooltipItems[0].label;
+                            },
+                            label: function (context) {
+                                return `Aantal: ${context.parsed.y}`;
+                            },
+                            afterLabel: function (context) {
+                                // Return confidence if available
+                                if (chartData.confidenceLabels && chartData.confidenceLabels[context.dataIndex]) {
+                                    return chartData.confidenceLabels[context.dataIndex];
+                                }
+                                return '';
+                            }
+                        }
+                    }
                 },
                 scales: {
-                    x: { beginAtZero: true, grid: { display: true, color: 'rgba(0, 0, 0, 0.1)' } },
-                    y: { beginAtZero: true, grid: { display: true, color: 'rgba(0, 0, 0, 0.1)' } }
+                    x: {
+                        beginAtZero: true,
+                        grid: { display: false },
+                        ticks: {
+                            color: '#333333',
+                            font: {
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { display: true, color: 'rgba(0, 0, 0, 0.1)' },
+                        title: {
+                            display: true,
+                            text: 'Voorspeld aantal'
+                        }
+                    }
                 },
-                interaction: { intersect: false, mode: 'index' }
+                barPercentage: 0.7,       // Make bars wider
+                categoryPercentage: 0.8,  // Reduce gap between categories
+                layout: {
+                    padding: {
+                        top: 20,
+                        right: 20,
+                        bottom: 10,
+                        left: 10
+                    }
+                }
             }
         });
-        console.log('Type distribution chart initialized successfully');
+        console.log('Prediction chart initialized successfully');
     } catch (error) {
-        console.error('Error initializing type distribution chart:', error);
+        console.error('Error initializing prediction chart:', error);
     }
 };
+
 
 
 // Frequency Chart
