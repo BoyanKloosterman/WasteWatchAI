@@ -30,17 +30,17 @@ available_features = []
 weather_mapping = {}
 
 class PredictionRequest(BaseModel):
-    datum: str  # Format: "YYYY-MM-DD"
+    date: str 
     latitude: float = 51.5890  # Default voor Breda centrum
     longitude: float = 4.7750  # Default voor Breda centrum
 
 class PredictionResponse(BaseModel):
-    datum: str
+    date: str 
     latitude: float
     longitude: float
-    temperatuur: float
-    weersverwachting: str
-    weather_source: str  # Nieuw: toont bron van weather data
+    temperature: float 
+    weather_description: str 
+    weather_source: str
     predictions: Dict[str, int]
     confidence_scores: Dict[str, float]
     model_used_per_category: Dict[str, str] = {}
@@ -48,27 +48,29 @@ class PredictionResponse(BaseModel):
 
 
 def get_weather_from_openmeteo(date_str: str, latitude: float, longitude: float):
-    """Haal weer data op van OpenMeteo API voor specifieke datum en locatie"""
+    """Get weather data from OpenMeteo API for specific date and location"""
     try:
-        # Parse datum
+        # Parse date
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         today = datetime.now().date()
         
-        # Bepaal of het historische data of forecast is
+        # Determine if historical data or forecast
         if target_date <= today:
-            # Historische data
+            # Historical data
             api_url = "https://archive-api.open-meteo.com/v1/archive"
+            temp_params = 'temperature_2m_mean,temperature_2m_max,temperature_2m_min'
         else:
-            # Forecast data
+            # Forecast data - use more parameters
             api_url = "https://api.open-meteo.com/v1/forecast"
+            temp_params = 'temperature_2m_max,temperature_2m_min,temperature_2m_mean'
         
-        # API parameters
+        # API parameters - request multiple temperature types
         params = {
             'latitude': latitude,
             'longitude': longitude,
             'start_date': date_str,
             'end_date': date_str,
-            'daily': 'temperature_2m_mean,weather_code',
+            'daily': f'{temp_params},weather_code',
             'timezone': 'Europe/Amsterdam'
         }
         
@@ -77,31 +79,75 @@ def get_weather_from_openmeteo(date_str: str, latitude: float, longitude: float)
         
         if response.status_code == 200:
             data = response.json()
-            print(f"🔍 OpenMeteo response: {data}")  # Debug log
+            print(f"🔍 OpenMeteo response: {data}")
             
             if 'daily' in data and data['daily']['time']:
-                # Pak eerste (en enige) dag
-                temperature = data['daily']['temperature_2m_mean'][0] if data['daily']['temperature_2m_mean'] else None
-                weather_code = data['daily']['weather_code'][0] if data['daily']['weather_code'] else None
+                daily_data = data['daily']
                 
-                # Valideer dat we echte data hebben
-                if temperature is None or weather_code is None:
-                    raise Exception(f"OpenMeteo returned None values: temp={temperature}, code={weather_code}")
+                # Try different temperature sources
+                temperature = None
+                temp_source = None
                 
-                # Extra validatie voor realistische temperatuur
-                if not isinstance(temperature, (int, float)) or temperature < -50 or temperature > 60:
-                    raise Exception(f"Invalid temperature value: {temperature}")
+                # 1. Try temperature_2m_mean
+                if 'temperature_2m_mean' in daily_data and daily_data['temperature_2m_mean']:
+                    temp_val = daily_data['temperature_2m_mean'][0]
+                    if temp_val is not None:
+                        temperature = temp_val
+                        temp_source = "mean"
                 
-                # Map weather code to Dutch description
-                weather_description = map_weather_code_to_description(weather_code)
+                # 2. If mean doesn't work, calculate from max/min
+                if temperature is None:
+                    temp_max = None
+                    temp_min = None
+                    
+                    if 'temperature_2m_max' in daily_data and daily_data['temperature_2m_max']:
+                        temp_max = daily_data['temperature_2m_max'][0]
+                    
+                    if 'temperature_2m_min' in daily_data and daily_data['temperature_2m_min']:
+                        temp_min = daily_data['temperature_2m_min'][0]
+                    
+                    if temp_max is not None and temp_min is not None:
+                        temperature = (temp_max + temp_min) / 2
+                        temp_source = f"calculated from max({temp_max}°C) and min({temp_min}°C)"
+                    elif temp_max is not None:
+                        temperature = temp_max - 3  # Estimate: max - 3°C for average
+                        temp_source = f"estimated from max({temp_max}°C)"
+                    elif temp_min is not None:
+                        temperature = temp_min + 3  # Estimate: min + 3°C for average
+                        temp_source = f"estimated from min({temp_min}°C)"
                 
-                print(f"✅ Weather data: {temperature}°C, {weather_description}")
+                # 3. Get weather code
+                weather_code = daily_data.get('weather_code', [None])[0] if daily_data.get('weather_code') else None
                 
-                return {
-                    'temperatuur': round(float(temperature), 1),
-                    'weersverwachting': weather_description,
-                    'weather_source': 'OpenMeteo API'
-                }
+                # 4. If we have temperature, use it
+                if temperature is not None and isinstance(temperature, (int, float)) and -50 <= temperature <= 60:
+                    weather_description = map_weather_code_to_description(weather_code) if weather_code is not None else 'Cloudy'
+                    
+                    print(f"✅ Weather data: {temperature}°C ({temp_source}), {weather_description}")
+                    
+                    return {
+                        'temperature': round(float(temperature), 1),
+                        'weather_description': weather_description,
+                        'weather_source': f'OpenMeteo API ({temp_source})'
+                    }
+                
+                # 5. If only weather code available
+                elif weather_code is not None:
+                    # Use seasonal average + weather code
+                    month = datetime.strptime(date_str, '%Y-%m-%d').month
+                    seasonal_temp = get_seasonal_temperature(month)
+                    weather_description = map_weather_code_to_description(weather_code)
+                    
+                    print(f"✅ Partial weather data: {seasonal_temp}°C (seasonal), {weather_description} (OpenMeteo)")
+                    
+                    return {
+                        'temperature': seasonal_temp,
+                        'weather_description': weather_description,
+                        'weather_source': 'OpenMeteo weather + seasonal temperature'
+                    }
+                
+                else:
+                    raise Exception(f"No valid temperature or weather data: temp={temperature}, code={weather_code}")
             else:
                 raise Exception(f"Invalid OpenMeteo response structure: {data}")
         else:
@@ -110,28 +156,16 @@ def get_weather_from_openmeteo(date_str: str, latitude: float, longitude: float)
     except Exception as e:
         print(f"❌ OpenMeteo API failed: {e}")
         
-        # Fallback naar seizoensgemiddelden voor Nederland
+        # Complete fallback
         month = datetime.strptime(date_str, '%Y-%m-%d').month
+        fallback_temp = get_seasonal_temperature(month)
+        fallback_weather = get_seasonal_weather(month)
         
-        # Nederlandse seizoensgemiddelden
-        if month in [12, 1, 2]:  # Winter
-            fallback_temp = 5.0
-            fallback_weather = 'Bewolkt'
-        elif month in [3, 4, 5]:  # Lente
-            fallback_temp = 12.0
-            fallback_weather = 'Gedeeltelijk bewolkt'
-        elif month in [6, 7, 8]:  # Zomer
-            fallback_temp = 20.0
-            fallback_weather = 'Zonnig'
-        else:  # Herfst
-            fallback_temp = 12.0
-            fallback_weather = 'Regenachtig'
-        
-        print(f"🔄 Using fallback weather: {fallback_temp}°C, {fallback_weather}")
+        print(f"🔄 Using complete fallback: {fallback_temp}°C, {fallback_weather}")
         
         return {
-            'temperatuur': fallback_temp,
-            'weersverwachting': fallback_weather,
+            'temperature': fallback_temp,
+            'weather_description': fallback_weather,
             'weather_source': 'Fallback (seasonal average)'
         }
 
@@ -147,13 +181,13 @@ def map_weather_code_to_description(weather_code):
         51: 'Lichte motregen',
         53: 'Motregen',
         55: 'Motregen',
-        56: 'Ijzel',
-        57: 'Ijzel',
+        56: 'IJzel',
+        57: 'IJzel',
         61: 'Lichte regen',
         63: 'Regen',
         65: 'Zware regen',
-        66: 'Ijzel',
-        67: 'Ijzel',
+        66: 'IJzel',
+        67: 'IJzel',
         71: 'Lichte sneeuw',
         73: 'Sneeuw',
         75: 'Zware sneeuw',
@@ -170,6 +204,27 @@ def map_weather_code_to_description(weather_code):
     
     return weather_code_mapping.get(weather_code, 'Bewolkt')
 
+def get_seasonal_weather(month):
+    """Get typical weather for season in Netherlands (Dutch descriptions)"""
+    if month in [12, 1, 2]:  # Winter
+        return 'Bewolkt'
+    elif month in [3, 4, 5]:  # Spring
+        return 'Gedeeltelijk bewolkt'
+    elif month in [6, 7, 8]:  # Summer
+        return 'Zonnig'
+    else:  # Autumn
+        return 'Regenachtig'
+
+def get_seasonal_temperature(month):
+    """Get seasonal average temperature for Netherlands"""
+    if month in [12, 1, 2]:  # Winter
+        return 5.0
+    elif month in [3, 4, 5]:  # Spring
+        return 12.0
+    elif month in [6, 7, 8]:  # Summer
+        return 20.0
+    else:  # Autumn (9, 10, 11)
+        return 12.0
 
 def load_data_and_train_models():
     """Load data and train both Decision Tree and Random Forest models"""
@@ -472,12 +527,12 @@ def calculate_prediction_confidence(model, input_data, target_name):
         return 0.3
 
 def predict_waste(date_str: str, latitude: float, longitude: float):
-    """Voorspel afval voor specifieke datum en locatie (weer wordt automatisch opgehaald)"""
+    """Predict waste for specific date and location (weather is automatically fetched)"""
     
-    # Haal weer data op van OpenMeteo
+    # Get weather data from OpenMeteo
     weather_data = get_weather_from_openmeteo(date_str, latitude, longitude)
-    temperatuur = weather_data['temperatuur']
-    weersverwachting = weather_data['weersverwachting']
+    temperature = weather_data['temperature']
+    weather_description = weather_data['weather_description']
     
     # Convert date string to datetime
     date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -490,36 +545,67 @@ def predict_waste(date_str: str, latitude: float, longitude: float):
     
     # Calculate derived features
     is_weekend = 1 if weekday >= 5 else 0
-    seizoen_mapping = {
+    season_mapping = {
         12: 0, 1: 0, 2: 0,  # Winter
-        3: 1, 4: 1, 5: 1,   # Lente  
-        6: 2, 7: 2, 8: 2,   # Zomer
-        9: 3, 10: 3, 11: 3  # Herfst
+        3: 1, 4: 1, 5: 1,   # Spring  
+        6: 2, 7: 2, 8: 2,   # Summer
+        9: 3, 10: 3, 11: 3  # Autumn
     }
-    seizoen = seizoen_mapping[month]
+    season = season_mapping[month]
     
-    # Map weather description to numeric
-    weersverwachting_num = weather_mapping.get(weersverwachting, 1)
+    # Map weather description to numeric (update mapping for English)
+    weather_mapping_english = {
+        'Clear sky': 0,
+        'Mainly clear': 1,
+        'Partly cloudy': 1,
+        'Overcast': 2,
+        'Cloudy': 2,
+        'Fog': 6,
+        'Light drizzle': 3,
+        'Moderate drizzle': 3,
+        'Dense drizzle': 3,
+        'Slight rain': 3,
+        'Moderate rain': 3,
+        'Heavy rain': 3,
+        'Rainy': 3,
+        'Thunderstorm': 4,
+        'Slight snow fall': 5,
+        'Moderate snow fall': 5,
+        'Heavy snow fall': 5,
+        'Unknown': 1
+    }
+    
+    weather_num = weather_mapping_english.get(weather_description, 1)
     
     # Create input data
     input_values = np.array([[
         latitude, longitude, year, month, day, weekday,
-        temperatuur, weersverwachting_num, is_weekend, seizoen
+        temperature, weather_num, is_weekend, season
     ]])
     
-    # Make predictions voor alle categorieën
-    categories = ['Plastic', 'Papier', 'Organisch', 'Glas']
+    # Make predictions for all categories
+    categories = ['Plastic', 'Paper', 'Organic', 'Glass']  # English names
     predictions = {}
     confidence_scores = {}
     model_used_per_category = {}
     
+    # Map to Dutch model names (if your models were trained with Dutch names)
+    category_mapping = {
+        'Plastic': 'Plastic',
+        'Paper': 'Papier', 
+        'Organic': 'Organisch',
+        'Glass': 'Glas'
+    }
+    
     for category in categories:
-        # Gebruik Random Forest als beschikbaar, anders Decision Tree
-        if category in rf_models:
-            model = rf_models[category]
+        dutch_category = category_mapping[category]
+        
+        # Use Random Forest if available, otherwise Decision Tree
+        if dutch_category in rf_models:
+            model = rf_models[dutch_category]
             model_type = "random_forest"
-        elif category in dt_models:
-            model = dt_models[category]
+        elif dutch_category in dt_models:
+            model = dt_models[dutch_category]
             model_type = "decision_tree"
         else:
             predictions[category] = 0
@@ -528,12 +614,12 @@ def predict_waste(date_str: str, latitude: float, longitude: float):
             continue
         
         try:
-            # Maak voorspelling
+            # Make prediction
             prediction = model.predict(input_values)[0]
             predictions[category] = max(0, round(prediction))
             
-            # Bereken confidence
-            confidence = calculate_prediction_confidence(model, input_values, category)
+            # Calculate confidence
+            confidence = calculate_prediction_confidence(model, input_values, dutch_category)
             confidence_scores[category] = confidence
             model_used_per_category[category] = model_type
             
@@ -546,7 +632,7 @@ def predict_waste(date_str: str, latitude: float, longitude: float):
     # Calculate overall confidence
     avg_confidence = np.mean(list(confidence_scores.values())) if confidence_scores else 0
     
-    # Overall model gebruikt
+    # Overall model used
     model_types = list(model_used_per_category.values())
     overall_model = "random_forest" if "random_forest" in model_types else "mixed"
     
@@ -574,28 +660,28 @@ def startup_models():
 
 @router.post("/predict", response_model=PredictionResponse)
 async def predict_waste_endpoint(request: PredictionRequest):
-    """Predict waste amounts - weather data wordt automatisch opgehaald van OpenMeteo"""
+    """Predict waste amounts - weather data is automatically fetched from OpenMeteo"""
     try:
         # Validate date format
-        datetime.strptime(request.datum, '%Y-%m-%d')
+        datetime.strptime(request.date, '%Y-%m-%d')
         
         # Check if models are loaded
         if not dt_models and not rf_models:
             raise HTTPException(status_code=503, detail="Models not loaded yet")
         
-        # Make prediction (weather wordt automatisch opgehaald)
+        # Make prediction (weather is automatically fetched)
         predictions, confidence_scores, all_model_confidence, model_used, avg_confidence, model_used_per_category, weather_data = predict_waste(
-            request.datum,
+            request.date,
             request.latitude,
             request.longitude
         )
         
         return PredictionResponse(
-            datum=request.datum,
+            date=request.date,
             latitude=request.latitude,
             longitude=request.longitude,
-            temperatuur=weather_data['temperatuur'],
-            weersverwachting=weather_data['weersverwachting'],
+            temperature=weather_data['temperature'],
+            weather_description=weather_data['weather_description'],
             weather_source=weather_data['weather_source'],
             predictions=predictions,
             confidence_scores=confidence_scores,

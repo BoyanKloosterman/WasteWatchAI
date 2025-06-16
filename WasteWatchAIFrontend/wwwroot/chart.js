@@ -4,6 +4,7 @@ let frequencyChart = null;
 let correlationChart = null;
 let weatherDistributionChart = null;
 let scatterChart = null;
+let predictionChart = null;
 
 // Initialize tooltips on page load
 document.addEventListener('DOMContentLoaded', function () {
@@ -39,6 +40,55 @@ window.initializeTypeDistributionChart = function (chartData) {
 
     try {
         typeDistributionChart = new Chart(ctx, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: false },
+                    legend: { display: true, position: 'top' }
+                },
+                scales: {
+                    x: { beginAtZero: true, grid: { display: true, color: 'rgba(0, 0, 0, 0.1)' } },
+                    y: { beginAtZero: true, grid: { display: true, color: 'rgba(0, 0, 0, 0.1)' } }
+                },
+                interaction: { intersect: false, mode: 'index' }
+            }
+        });
+        console.log('Type distribution chart initialized successfully');
+    } catch (error) {
+        console.error('Error initializing type distribution chart:', error);
+    }
+};
+
+// Prediction Chart
+window.initializePredictionChart = function (chartData) {
+    const ctx = document.getElementById('predictionChart');
+    if (!ctx) {
+        console.error('predictionChart canvas element not found');
+        return;
+    }
+
+    // Log the chart data we received to debug
+    console.log('Chart data received:', JSON.stringify(chartData, null, 2));
+
+    // Destroy chart if no data
+    if (!chartData || !chartData.labels || chartData.labels.length === 0) {
+        if (predictionChart) {
+            predictionChart.destroy();
+            predictionChart = null;
+        }
+        ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+        return;
+    }
+
+    if (predictionChart) {
+        predictionChart.destroy();
+    }
+
+    try {
+        predictionChart = new Chart(ctx, {
             type: 'bar',
             data: chartData,
             options: {
@@ -319,6 +369,7 @@ window.initializeScatterChart = function (chartData) {
 // Debug function to check if all functions are available
 window.checkChartFunctions = function () {
     console.log('Chart functions available:');
+    console.log('- initializePredictionChart:', typeof window.initializePredictionChart);
     console.log('- initializeTypeDistributionChart:', typeof window.initializeTypeDistributionChart);
     console.log('- initializeFrequencyChart:', typeof window.initializeFrequencyChart);
     console.log('- initializeCorrelationChart:', typeof window.initializeCorrelationChart);
@@ -353,6 +404,11 @@ window.destroyAllCharts = function () {
     if (scatterChart) {
         scatterChart.destroy();
         scatterChart = null;
+    }
+
+    if (predictionChart) {
+        predictionChart.destroy();
+        predictionChart = null;
     }
 
     console.log('All charts destroyed successfully');
