@@ -227,16 +227,26 @@
             <div class="card shadow-sm h-100">
                 <div class="card-body">
                     <h5 class="card-title fw-bold mb-4">Interactieve kaart</h5>
-                    <div class="bg-light rounded p-4 d-flex justify-content-center align-items-center" style="height: 250px;">
-                        <div class="text-center text-muted">
-                            <div>Kaart placeholder</div>
-                        </div>
-                    </div>
+                    <div id="wasteMap" style="height: 250px; width: 100%; border-radius: 0.375rem;"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin="" />
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
 
 <style>
     .text-purple {
@@ -265,6 +275,24 @@
         border-bottom: 2px solid #dee2e6;
         font-weight: 600;
     }
+
+    .leaflet-popup-content-wrapper {
+        border-radius: 8px;
+    }
+
+    .custom-popup {
+        font-family: inherit;
+    }
+
+        .custom-popup h6 {
+            margin-bottom: 8px;
+            color: #634AFF;
+            font-weight: bold;
+        }
+
+        .custom-popup .badge {
+            font-size: 0.75em;
+        }
 </style>
 
 @code {
@@ -292,6 +320,8 @@
     private List<string> notifiedHighAlerts = new();
     private IJSObjectReference? _chartModule;
     private IJSObjectReference? _chartInstance;
+    private IJSObjectReference? _mapModule;
+    private bool _mapInitialized = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -305,6 +335,7 @@
                 await LoadDummyTrashData();
                 CheckForHighPriorityAlerts();
                 await UpdateChart();
+                await UpdateMap();
                 StateHasChanged();
             });
         }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
@@ -314,10 +345,57 @@
     {
         if (firstRender)
         {
-            _chartModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                "import", "./chartInterop.js");
-            await UpdateChart();
+            try
+            {
+                _chartModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./chartInterop.js");
+                await UpdateChart();
+                await InitializeMap();
+            }
+            catch { }
         }
+    }
+
+    private async Task InitializeMap()
+    {
+        try
+        {
+            var leafletAvailable = await JSRuntime.InvokeAsync<bool>("eval", "typeof L !== 'undefined'");
+            if (!leafletAvailable)
+            {
+                await Task.Delay(500);
+                await InitializeMap();
+                return;
+            }
+
+            await JSRuntime.InvokeVoidAsync("initializeMap");
+            _mapInitialized = true;
+            await Task.Delay(100);
+            await UpdateMap();
+        }
+        catch { }
+    }
+
+    private async Task UpdateMap()
+    {
+        if (!_mapInitialized) return;
+
+        try
+        {
+            var filteredData = GetFilteredData();
+            var mapData = filteredData.Select(item => new
+            {
+                lat = (double)item.Latitude,
+                lng = (double)item.Longitude,
+                litterType = item.LitterType,
+                timestamp = item.Timestamp.ToString("dd-MM-yyyy HH:mm"),
+                location = GetLocationName(item.Latitude, item.Longitude)
+            }).ToList();
+
+            var jsonData = JsonSerializer.Serialize(mapData);
+            await JSRuntime.InvokeVoidAsync("updateMapMarkers", jsonData);
+        }
+        catch { }
     }
 
     private async Task UpdateChart()
@@ -343,10 +421,7 @@
                 }
             }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error updating chart: {ex.Message}");
-        }
+        catch { }
     }
 
     private Dictionary<string, int> GetLitterTypeCounts()
@@ -470,11 +545,13 @@
             {
                 await _chartModule.DisposeAsync();
             }
+
+            if (_mapModule is not null)
+            {
+                await _mapModule.DisposeAsync();
+            }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error during disposal: {ex.Message}");
-        }
+        catch { }
     }
 
     private async Task LoadDummyTrashData()
@@ -488,10 +565,7 @@
                 trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
             }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading trash data: {ex.Message}");
-        }
+        catch { }
     }
 
     private async Task OnFilterChanged()
@@ -553,8 +627,7 @@
                         !string.IsNullOrEmpty(selectedDateRange);
 
         await UpdateChart();
-
-        Console.WriteLine($"Filters toegepast - Totaal aantal items: {filteredTrashItems.Count}, Filters actief: {filtersApplied}");
+        await UpdateMap();
     }
 
     private List<LocationAlert> GetLocationAlerts()
@@ -593,7 +666,7 @@
                     CountLast24Hours = last24HourItems.Count,
                     TotalCount = locationItems.Count,
                     LastAlert = locationItems.Where(item => item.Timestamp <= now).Any() ?
-                                       locationItems.Where(item => item.Timestamp <= now).Max(item => item.Timestamp) : null
+                                               locationItems.Where(item => item.Timestamp <= now).Max(item => item.Timestamp) : null
                 };
 
             if (alert.CountLastHour >= 3)
@@ -684,3 +757,79 @@
         return locations[random.Next(locations.Length)];
     }
 }
+
+<script>
+    let map;
+    let markersLayer;
+
+    const litterTypeColors = {
+        'Plastic': '#e74c3c',
+        'Papier': '#3498db',
+        'Glas': '#2ecc71',
+        'Organisch': '#f39c12'
+    };
+
+    window.initializeMap = function() {
+        try {
+            map = L.map('wasteMap').setView([51.5861, 4.7767], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            markersLayer = L.layerGroup().addTo(map);
+        } catch {}
+    };
+
+    window.updateMapMarkers = function(jsonData) {
+        try {
+            const trashData = JSON.parse(jsonData);
+
+            if (!map || !markersLayer) {
+                return;
+            }
+
+            if (!Array.isArray(trashData) || trashData.length === 0) {
+                return;
+            }
+
+            markersLayer.clearLayers();
+
+            trashData.forEach((item, index) => {
+                if (typeof item.lat !== 'number' || typeof item.lng !== 'number') {
+                    return;
+                }
+
+                const color = litterTypeColors[item.litterType] || '#95a5a6';
+
+                const lat = item.lat + (Math.random() - 0.5) * 0.00002;
+                const lng = item.lng + (Math.random() - 0.5) * 0.00002;
+
+                const marker = L.circleMarker([lat, lng], {
+                    radius: 5,
+                    fillColor: color,
+                    color: '#fff',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
+
+                const popupContent = `
+                    <div class="custom-popup">
+                        <h6>${item.location || 'Onbekende locatie'}</h6>
+                        <p><strong>Type:</strong> <span style="color:${color}">${item.litterType || 'Onbekend'}</span></p>
+                        <p><strong>Tijd:</strong> ${item.timestamp || 'Onbekend'}</p>
+                        <p><strong>Coördinaten:</strong> ${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}</p>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                markersLayer.addLayer(marker);
+            });
+
+            if (trashData.length > 1000) {
+                map.setZoom(14);
+            }
+        } catch {}
+    };
+</script>
