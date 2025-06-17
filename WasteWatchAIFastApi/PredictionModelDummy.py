@@ -231,7 +231,7 @@ def load_data_and_train_models():
     global dt_models, rf_models, dt_r2_scores, rf_r2_scores, available_features, weather_mapping
     
     # API URLs
-    trashUrl = "http://host.docker.internal:8080/api/TrashItems/trash"
+    trashUrl = "http://host.docker.internal:8080/api/TrashItems/dummy"
     weerUrl = "http://host.docker.internal:8080/api/Weather/"
     
     try:
@@ -646,7 +646,7 @@ def get_best_model_type():
     return "random_forest" if rf_models else "decision_tree"
 
 # Startup function - aangeroepen wanneer server start
-def startup_models():
+def startup_models_dummy():
     """Initialize models on startup"""
     print("Starting Waste Prediction API...")
     success = load_data_and_train_models()
@@ -658,7 +658,7 @@ def startup_models():
 # Roep startup functie aan
 # startup_models()
 
-@router.post("/predict/trash", response_model=PredictionResponse)
+@router.post("/predict/dummy", response_model=PredictionResponse)
 async def predict_waste_endpoint(request: PredictionRequest):
     """Predict waste amounts - weather data is automatically fetched from OpenMeteo"""
     try:

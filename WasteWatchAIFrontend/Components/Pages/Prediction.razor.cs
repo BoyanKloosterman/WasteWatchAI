@@ -18,7 +18,7 @@ namespace WasteWatchAIFrontend.Components.Pages
         private DateTime maxDate = DateTime.Today.AddDays(14);
 
         private bool isLoading = false;
-        private bool useDummyData = false;
+        private bool useDummyData = true;
         private bool chartsNeedUpdate = false;
 
         private string GetConfidenceColorClass(float confidence)
@@ -26,6 +26,17 @@ namespace WasteWatchAIFrontend.Components.Pages
             if (confidence >= 0.75f) return "bg-success";
             if (confidence >= 0.5f) return "bg-warning";
             return "bg-danger";
+        }
+
+        private async Task ToggleDataMode()
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            await Task.Yield();
+
+            isLoading = false;
+            StateHasChanged();
         }
 
         private async Task HandlePrediction()
@@ -46,7 +57,16 @@ namespace WasteWatchAIFrontend.Components.Pages
                     Longitude = 4.775
                 };
 
-                var response = await httpClient.PostAsJsonAsync("api/prediction/predict", payload);
+                HttpResponseMessage response;
+                if (useDummyData)
+                {
+                    response = await httpClient.PostAsJsonAsync("api/prediction/predict/dummy", payload);
+                }
+                else
+                {
+                    response = await httpClient.PostAsJsonAsync("api/prediction/predict/trash", payload);
+                }
+
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -56,7 +76,7 @@ namespace WasteWatchAIFrontend.Components.Pages
                 }
                 else
                 {
-                    predictionResult = null;
+                    predictionResult = new PredictionResponse();
                 }
             }
             catch (Exception ex)

@@ -10,6 +10,15 @@
         </ol>
     </nav>
 
+    <h1 class="h2 mb-4">Datafilters</h1>
+    <div class="mb-3">
+        <button class="btn btn-outline-primary"
+                @onclick="async () => { useDummyData = !useDummyData; await ToggleDataMode(); }">
+            <i class="fas @(useDummyData ? "fa-database" : "fa-vial") me-2"></i>
+            Gebruik @(useDummyData ? "echte data" : "dummy data")
+        </button>
+    </div>
+
     <div class="row mb-4">
         <div class="col-md-6">
             <div class="card">

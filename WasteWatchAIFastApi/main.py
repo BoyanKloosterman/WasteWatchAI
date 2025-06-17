@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from typing import List
 import json
 from contextlib import asynccontextmanager
+from PredictionModelDummy import router as predictionDummy_router
 from PredictionModel import router as prediction_router
 from CorrelationModel import router as correlation_router
 
@@ -21,12 +22,13 @@ async def lifespan(app: FastAPI):
     print("🚀 Starting WasteWatch AI FastAPI...")
     
     # Import here to avoid circular imports
+    from PredictionModelDummy import startup_models_dummy
     from PredictionModel import startup_models
-    
     # Try to initialize models with fallback
     try:
         print("📊 Initializing prediction models...")
         startup_models()
+        startup_models_dummy()
         print("✅ Models initialized successfully!")
     except Exception as e:
         print(f"⚠️  Model initialization failed, but server will continue: {e}")
@@ -38,7 +40,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(prediction_router, prefix="/api/prediction", tags=["Perdiction"])
+app.include_router(predictionDummy_router, prefix="/api/prediction", tags=["Prediction"])
+app.include_router(prediction_router, prefix="/api/prediction", tags=["Prediction"])
 app.include_router(correlation_router, prefix="/api/correlation", tags=["Correlation"])
 
 # CORS middleware - exact zoals in main.py
