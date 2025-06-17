@@ -1,0 +1,124 @@
+﻿@page "/prediction"
+@rendermode InteractiveServer
+
+<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="pt-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="dashboard" class="text-decoration-none">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Prediction</li>
+        </ol>
+    </nav>
+
+    <h1 class="h2 mb-4">Datafilters</h1>
+    <div class="mb-3">
+        <button class="btn btn-outline-primary"
+                @onclick="async () => { useDummyData = !useDummyData; await ToggleDataMode(); }">
+            <i class="fas @(useDummyData ? "fa-database" : "fa-vial") me-2"></i>
+            Gebruik @(useDummyData ? "echte data" : "dummy data")
+        </button>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Afvalvoorspelling</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text text-muted mb-3">
+                        Selecteer een datum om een voorspelling te genereren van het verwachte afvalvolume per categorie.
+                    </p>
+                    <div class="mb-3">
+                        <label for="datePicker" class="form-label">Selecteer een datum:</label>
+                        <InputDate @bind-Value="selectedDate"
+                           AdditionalAttributes="@(new Dictionary<string, object>
+                           {
+                               { "id", "datePicker" },
+                               { "class", "form-control" },
+                               { "min", minDate.ToString("yyyy-MM-dd") },
+                               { "max", maxDate.ToString("yyyy-MM-dd") }
+                           })" />
+                    </div>
+
+                    <button @onclick="HandlePrediction" class="btn btn-primary" type="button" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Bezig met laden...</span>
+                        }
+                        else
+                        {
+                            <span>Genereer Voorspelling</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (predictionResult != null)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Voorspellingsresultaat</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-calendar me-2 text-primary"></i>
+                            <strong>Datum:</strong>
+                        </div>
+                        <p>@predictionResult.Date</p>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-thermometer-half me-2 text-danger"></i>
+                            <strong>Temperatuur:</strong>
+                        </div>
+                        <p>@predictionResult.Temperature°C</p>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-cloud me-2 text-info"></i>
+                            <strong>Weer:</strong>
+                        </div>
+                        <p>@predictionResult.weather_description</p>
+                    </div>
+                </div>
+
+                <div class="chart-container" style="height: 400px;">
+                    <canvas id="predictionChart"></canvas>
+                </div>
+
+                <div class="mt-4">
+                    <h6>Gebruikte modellen en betrouwbaarheid per categorie</h6>
+                    <ul class="list-group">
+                        @foreach (var modelInfo in predictionResult.Model_Used_Per_Category)
+                        {
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span><strong>@modelInfo.Key</strong></span>
+                                    <span class="badge bg-primary rounded-pill">@modelInfo.Value</span>
+                                </div>
+                                @if (predictionResult.Confidence_Scores.TryGetValue(modelInfo.Key, out var confidence))
+                                {
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar @GetConfidenceColorClass(confidence)" role="progressbar"
+                                             style="width: @(confidence * 100)%;"
+                                             aria-valuenow="@(confidence * 100)" aria-valuemin="0" aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-end mt-1">
+                                        <small class="text-muted">Betrouwbaarheid: @((confidence * 100).ToString("0.0"))%</small>
+                                    </div>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    }
+</main>
