@@ -1,0 +1,800 @@
+@page "/map"
+@using WasteWatchAIFrontend.Models
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject IJSRuntime JSRuntime
+@inject IHttpClientFactory HttpClientFactory
+
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard</PageTitle>
+
+
+<div class="container py-4">
+
+    @* De titel *@
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 fw-bold">
+            Afvalbeheer Kaart
+        </h1>
+        <div class="text-muted small">
+            Laatste update: @DateTime.Now.ToString("HH:mm")
+        </div>
+    </div>
+
+    @* De filters *@
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-sm-6 col-md-4">
+                    <label class="form-label fw-bold">Afvaltype</label>
+                    <select class="form-select" @bind="selectedLitterType" @bind:after="OnFilterChanged">
+                        <option value="">Alle types</option>
+                        <option value="Plastic">Plastic</option>
+                        <option value="Papier">Papier</option>
+                        <option value="Glas">Glas</option>
+                        <option value="Organisch">Organisch</option>
+                    </select>
+                </div>
+
+                <div class="col-sm-6 col-md-4">
+                    <label class="form-label fw-bold">Locatie</label>
+                    <select class="form-select" @bind="selectedLocation" @bind:after="OnFilterChanged">
+                        <option value="">Alle locaties</option>
+                        <option value="Grote Markt Breda">Grote Markt Breda</option>
+                        <option value="Centraal Station Breda">Centraal Station Breda</option>
+                        <option value="Valkenberg Park">Valkenberg Park</option>
+                        <option value="Haagdijk">Haagdijk</option>
+                        <option value="Chassé Park">Chassé Park</option>
+                        <option value="Chasséveld">Chasséveld</option>
+                    </select>
+                </div>
+
+                <div class="col-sm-6 col-md-4">
+                    <label class="form-label fw-bold">Datum</label>
+                    <select class="form-select" @bind="selectedDateRange" @bind:after="OnFilterChanged">
+                        <option value="">Alle periodes</option>
+                        <option value="Vandaag">Vandaag</option>
+                        <option value="Deze week">Deze week</option>
+                        <option value="Deze maand">Deze maand</option>
+                        <option value="Dit jaar">Dit jaar</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    @* De kaart *@
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-4">Afvalverdeling kaart</h5>
+                    <div id="wasteMap" style="height: 300px; width: 100%; border-radius: 0.375rem;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* De heatmap *@
+    @* <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-4">Heatmap</h5>
+                    <div id="heatMap" style="height: 300px; width: 100%; border-radius: 0.375rem;"></div>
+                </div>
+            </div>
+        </div>
+    </div> *@
+
+</div>
+
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin="" />
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
+
+<style>
+    .text-purple {
+        color: #634AFF;
+    }
+
+    .btn-purple {
+        background-color: #634AFF;
+        color: white;
+    }
+
+        .btn-purple:hover {
+            background-color: #5538e0;
+            color: white;
+        }
+
+    .border-purple {
+        border-color: #634AFF !important;
+    }
+
+    .table-custom tr:not(:last-child) td {
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .table-custom th {
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+    }
+
+    .leaflet-popup-content-wrapper {
+        border-radius: 8px;
+    }
+
+    .custom-popup {
+        font-family: inherit;
+    }
+
+        .custom-popup h6 {
+            margin-bottom: 8px;
+            color: #634AFF;
+            font-weight: bold;
+        }
+
+        .custom-popup .badge {
+            font-size: 0.75em;
+        }
+</style>
+
+@code {
+    private List<TrashItem> trashItems = new();
+    private List<TrashItem> filteredTrashItems = new();
+    private bool filtersApplied = false;
+
+    private string selectedLitterType = "";
+    private string selectedLocation = "";
+    private string selectedDateRange = "";
+
+    public class LocationAlert
+    {
+        public string LocationName { get; set; } = string.Empty;
+        public int CountLastHour { get; set; }
+        public int CountLast24Hours { get; set; }
+        public int TotalCount { get; set; }
+        public DateTime? LastAlert { get; set; }
+        public string Priority { get; set; } = "Laag";
+    }
+
+    private System.Threading.Timer? refreshTimer;
+    private bool showAlert = false;
+    private string alertMessage = string.Empty;
+    private List<string> notifiedHighAlerts = new();
+    private IJSObjectReference? _chartModule;
+    private IJSObjectReference? _chartInstance;
+    private IJSObjectReference? _mapModule;
+    private bool _mapInitialized = false;
+    private bool _heatMapInitialized = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDummyTrashData();
+        CheckForHighPriorityAlerts();
+
+        refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadDummyTrashData();
+                CheckForHighPriorityAlerts();
+                await UpdateChart();
+                await UpdateMap();
+                await UpdateHeatMap();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _chartModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./chartInterop.js");
+                await UpdateChart();
+                await InitializeMap();
+            }
+            catch { }
+        }
+    }
+
+    private async Task InitializeMap()
+    {
+        try
+        {
+            var leafletAvailable = await JSRuntime.InvokeAsync<bool>("eval", "typeof L !== 'undefined'");
+            if (!leafletAvailable)
+            {
+                await Task.Delay(500);
+                await InitializeMap();
+                return;
+            }
+
+            await JSRuntime.InvokeVoidAsync("initializeMap");
+            _mapInitialized = true;
+            _heatMapInitialized = true;
+            await Task.Delay(100);
+            await UpdateMap();
+            await UpdateHeatMap();
+
+        }
+        catch { }
+    }
+
+    private async Task UpdateMap()
+    {
+        if (!_mapInitialized) return;
+
+        try
+        {
+            var filteredData = GetFilteredData();
+            var mapData = filteredData.Select(item => new
+            {
+                lat = (double)item.Latitude,
+                lng = (double)item.Longitude,
+                litterType = item.LitterType,
+                timestamp = item.Timestamp.ToString("dd-MM-yyyy HH:mm"),
+                location = GetLocationName(item.Latitude, item.Longitude)
+            }).ToList();
+
+            var jsonData = JsonSerializer.Serialize(mapData);
+            await JSRuntime.InvokeVoidAsync("updateMapMarkers", jsonData);
+        }
+        catch { }
+    }
+
+    private async Task UpdateHeatMap()
+    {
+        if (!_heatMapInitialized) return;
+
+        try
+        {
+            var filteredData = GetFilteredData();
+            var mapData = filteredData.Select(item => new
+            {
+                lat = (double)item.Latitude,
+                lng = (double)item.Longitude,
+                litterType = item.LitterType,
+                timestamp = item.Timestamp.ToString("dd-MM-yyyy HH:mm"),
+                location = GetLocationName(item.Latitude, item.Longitude)
+            }).ToList();
+
+            // add heatmap configuration
+
+            var jsonData = JsonSerializer.Serialize(mapData);
+            await JSRuntime.InvokeVoidAsync("updateHeatMapMarkers", jsonData);
+        }
+        catch { }
+    }
+
+    private async Task UpdateChart()
+    {
+        try
+        {
+            if (_chartModule is not null)
+            {
+                if (_chartInstance is not null)
+                {
+                    await _chartInstance.InvokeVoidAsync("destroy");
+                    await _chartInstance.DisposeAsync();
+                    _chartInstance = null;
+                }
+
+                var counts = GetLitterTypeCounts();
+                if (counts.Any())
+                {
+                    _chartInstance = await _chartModule.InvokeAsync<IJSObjectReference>(
+                        "setupLitterTypeChart",
+                        counts.Keys.ToArray(),
+                        counts.Values.ToArray());
+                }
+            }
+        }
+        catch { }
+    }
+
+    private Dictionary<string, int> GetLitterTypeCounts()
+    {
+        var dataToUse = GetFilteredData();
+
+        if (!dataToUse.Any())
+            return new Dictionary<string, int>();
+
+        return dataToUse
+            .GroupBy(item => item.LitterType)
+            .OrderByDescending(group => group.Count())
+            .ToDictionary(
+                group => group.Key,
+                group => group.Count()
+            );
+    }
+
+    private List<TrashItem> GetFilteredData()
+    {
+        return filtersApplied ? filteredTrashItems : trashItems;
+    }
+
+    private string GetTotalLabel()
+    {
+        if (!filtersApplied || string.IsNullOrEmpty(selectedDateRange))
+            return "Totaal afval";
+
+        return selectedDateRange switch
+        {
+            "Vandaag" => "Afval vandaag",
+            "Deze week" => "Afval deze week",
+            "Deze maand" => "Afval deze maand",
+            "Dit jaar" => "Afval dit jaar",
+            _ => "Totaal afval"
+        };
+    }
+
+    private string GetTotalSubLabel()
+    {
+        if (!filtersApplied || string.IsNullOrEmpty(selectedDateRange))
+            return "Gedetecteerd in totaal";
+
+        return selectedDateRange switch
+        {
+            "Vandaag" => "Gedetecteerd vandaag",
+            "Deze week" => "Gedetecteerd deze week",
+            "Deze maand" => "Gedetecteerd deze maand",
+            "Dit jaar" => "Gedetecteerd dit jaar",
+            _ => "Gedetecteerd in totaal"
+        };
+    }
+
+    private int GetLast30DaysCount()
+    {
+        var now = DateTime.UtcNow;
+        var dertigDagenGeleden = now.AddDays(-30);
+
+        var baseData = GetFilteredData();
+
+        var last30DaysData = trashItems.AsQueryable();
+
+        if (!string.IsNullOrEmpty(selectedLocation))
+        {
+            last30DaysData = last30DaysData.Where(item =>
+                GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrEmpty(selectedLitterType))
+        {
+            last30DaysData = last30DaysData.Where(item =>
+                item.LitterType.Equals(selectedLitterType, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return last30DaysData
+            .Where(item => item.Timestamp >= dertigDagenGeleden && item.Timestamp <= now)
+            .Count();
+    }
+
+    private void CheckForHighPriorityAlerts()
+    {
+        var highAlerts = GetLocationAlerts()
+            .Where(a => a.Priority == "Hoog" && !notifiedHighAlerts.Contains(a.LocationName))
+            .ToList();
+
+        if (highAlerts.Any())
+        {
+            foreach (var alert in highAlerts)
+            {
+                notifiedHighAlerts.Add(alert.LocationName);
+            }
+
+            var locations = string.Join(", ", highAlerts.Select(a => a.LocationName));
+            alertMessage = $"Hoog risico op locatie(s): {locations}";
+            showAlert = true;
+
+            Task.Delay(60000).ContinueWith(_ =>
+            {
+                InvokeAsync(() =>
+                {
+                    showAlert = false;
+                    StateHasChanged();
+                });
+            });
+        }
+    }
+
+    public async void Dispose()
+    {
+        refreshTimer?.Dispose();
+
+        try
+        {
+            if (_chartInstance is not null)
+            {
+                await _chartInstance.InvokeVoidAsync("destroy");
+                await _chartInstance.DisposeAsync();
+            }
+
+            if (_chartModule is not null)
+            {
+                await _chartModule.DisposeAsync();
+            }
+
+            if (_mapModule is not null)
+            {
+                await _mapModule.DisposeAsync();
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadDummyTrashData()
+    {
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
+            var response = await httpClient.GetAsync("api/trashitems/dummy");
+            if (response.IsSuccessStatusCode)
+            {
+                trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
+            }
+        }
+        catch { }
+    }
+
+    private async Task OnFilterChanged()
+    {
+        await ApplyFilters();
+    }
+
+    private async Task ApplyFilters()
+    {
+        filteredTrashItems = trashItems.AsQueryable().ToList();
+
+        if (!string.IsNullOrEmpty(selectedLitterType))
+        {
+            filteredTrashItems = filteredTrashItems
+                .Where(item => item.LitterType.Equals(selectedLitterType, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        if (!string.IsNullOrEmpty(selectedLocation))
+        {
+            filteredTrashItems = filteredTrashItems
+                .Where(item => GetLocationName(item.Latitude, item.Longitude).Equals(selectedLocation, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        if (!string.IsNullOrEmpty(selectedDateRange))
+        {
+            var now = DateTime.Now;
+            DateTime startDate = now;
+            DateTime endDate = now;
+
+            switch (selectedDateRange)
+            {
+                case "Vandaag":
+                    startDate = now.Date;
+                    endDate = now.Date.AddDays(1).AddTicks(-1);
+                    break;
+                case "Deze week":
+                    startDate = now.AddDays(-(int)now.DayOfWeek).Date;
+                    endDate = startDate.AddDays(7).AddTicks(-1);
+                    break;
+                case "Deze maand":
+                    startDate = new DateTime(now.Year, now.Month, 1);
+                    endDate = startDate.AddMonths(1).AddTicks(-1);
+                    break;
+                case "Dit jaar":
+                    startDate = new DateTime(now.Year, 1, 1);
+                    endDate = startDate.AddYears(1).AddTicks(-1);
+                    break;
+            }
+
+            filteredTrashItems = filteredTrashItems
+                .Where(item => item.Timestamp >= startDate && item.Timestamp <= endDate)
+                .ToList();
+        }
+
+        filtersApplied = !string.IsNullOrEmpty(selectedLitterType) ||
+                        !string.IsNullOrEmpty(selectedLocation) ||
+                        !string.IsNullOrEmpty(selectedDateRange);
+
+        await UpdateChart();
+        await UpdateMap();
+        await UpdateHeatMap();
+    }
+
+    private List<LocationAlert> GetLocationAlerts()
+    {
+        var dataToUse = GetFilteredData();
+
+        if (!dataToUse.Any())
+            return new List<LocationAlert>();
+
+        var now = DateTime.Now;
+        var oneHourAgo = now.AddHours(-1);
+        var twentyFourHoursAgo = now.AddHours(-24);
+
+        var locationGroups = dataToUse
+            .GroupBy(item => GetLocationName(item.Latitude, item.Longitude))
+            .ToList();
+
+        var alerts = new List<LocationAlert>();
+
+        foreach (var group in locationGroups)
+        {
+            var locationItems = group.ToList();
+
+            var lastHourItems = locationItems.Where(item =>
+                item.Timestamp >= oneHourAgo &&
+                item.Timestamp <= now).ToList();
+
+            var last24HourItems = locationItems.Where(item =>
+                item.Timestamp >= twentyFourHoursAgo &&
+                item.Timestamp <= now).ToList();
+
+            var alert = new LocationAlert
+                {
+                    LocationName = group.Key,
+                    CountLastHour = lastHourItems.Count,
+                    CountLast24Hours = last24HourItems.Count,
+                    TotalCount = locationItems.Count,
+                    LastAlert = locationItems.Where(item => item.Timestamp <= now).Any() ?
+                                               locationItems.Where(item => item.Timestamp <= now).Max(item => item.Timestamp) : null
+                };
+
+            if (alert.CountLastHour >= 3)
+            {
+                alert.Priority = "Hoog";
+            }
+            else if (alert.CountLastHour >= 1)
+            {
+                alert.Priority = "Gemiddeld";
+            }
+            else
+            {
+                alert.Priority = "Laag";
+            }
+
+            alerts.Add(alert);
+        }
+
+        return alerts;
+    }
+
+    private List<(string LitterType, double Percentage)> GetTopLitterTypes(int topCount = 2)
+    {
+        var dataToUse = GetFilteredData();
+
+        if (!dataToUse.Any())
+            return new List<(string LitterType, double Percentage)>();
+
+        var totalCount = dataToUse.Count;
+
+        var litterTypeCounts = dataToUse
+            .GroupBy(item => item.LitterType)
+            .Select(group => new
+            {
+                LitterType = group.Key,
+                Count = group.Count(),
+                Percentage = (double)group.Count() / totalCount * 100
+            })
+            .OrderByDescending(x => x.Count)
+            .Take(topCount)
+            .Select(x => (x.LitterType, x.Percentage))
+            .ToList();
+
+        return litterTypeCounts;
+    }
+
+    private List<(string LocationName, double Percentage)> GetTopLocations(int topCount = 2)
+    {
+        var dataToUse = GetFilteredData();
+
+        if (!dataToUse.Any())
+            return new List<(string LocationName, double Percentage)>();
+
+        var totalCount = dataToUse.Count;
+
+        var locationCounts = dataToUse
+            .GroupBy(item => GetLocationName(item.Latitude, item.Longitude))
+            .Select(group => new
+            {
+                LocationName = group.Key,
+                Count = group.Count(),
+                Percentage = (double)group.Count() / totalCount * 100
+            })
+            .OrderByDescending(x => x.Count)
+            .Take(topCount)
+            .Select(x => (x.LocationName, x.Percentage))
+            .ToList();
+
+        return locationCounts;
+    }
+
+    private string GetLocationName(float latitude, float longitude)
+    {
+        if (latitude >= 51.5890 && latitude <= 51.5900 && longitude >= 4.7750 && longitude <= 4.7765)
+            return "Grote Markt Breda";
+        if (latitude >= 51.5953 && latitude <= 51.5963 && longitude >= 4.7787 && longitude <= 4.7797)
+            return "Centraal Station Breda";
+        if (latitude >= 51.5929 && latitude <= 51.5939 && longitude >= 4.7791 && longitude <= 4.7801)
+            return "Valkenberg Park";
+        if (latitude >= 51.5920 && latitude <= 51.5925 && longitude >= 4.7685 && longitude <= 4.7695)
+            return "Haagdijk";
+        if (latitude >= 51.5860 && latitude <= 51.5866 && longitude >= 4.7848 && longitude <= 4.7856)
+            return "Chassé Park";
+        if (latitude >= 51.5890 && latitude <= 51.5902 && longitude >= 4.7750 && longitude <= 4.7766)
+            return "Chasséveld";
+        var random = new Random((int)(latitude * 1000 + longitude * 1000));
+        var locations = new[] { "Stadspark", "Marktplein", "Winkelcentrum", "Sportpark", "Industrieterrein" };
+        return locations[random.Next(locations.Length)];
+    }
+}
+
+<script>
+    let map;
+    let markersLayer;
+
+    let heatMap;
+    let heatMapMarkersLayer;
+
+    const litterTypeColors = {
+        'Plastic': '#e74c3c',
+        'Papier': '#3498db',
+        'Glas': '#2ecc71',
+        'Organisch': '#f39c12'
+    };
+
+    // Hoofd-Kaart
+
+    // Opstarten Kaart
+    window.initializeMap = function() {
+        try {
+            map = L.map('wasteMap').setView([51.5861, 4.7767], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            markersLayer = L.layerGroup().addTo(map);
+        } catch {}
+    };
+
+    // Update Kaart
+    window.updateMapMarkers = function(jsonData) {
+        try {
+            const trashData = JSON.parse(jsonData);
+
+            if (!map || !markersLayer) {
+                return;
+            }
+
+            if (!Array.isArray(trashData) || trashData.length === 0) {
+                return;
+            }
+
+            markersLayer.clearLayers();
+
+            trashData.forEach((item, index) => {
+                if (typeof item.lat !== 'number' || typeof item.lng !== 'number') {
+                    return;
+                }
+
+                const color = litterTypeColors[item.litterType] || '#95a5a6';
+
+                const lat = item.lat + (Math.random() - 0.5) * 0.00002;
+                const lng = item.lng + (Math.random() - 0.5) * 0.00002;
+
+                const marker = L.circleMarker([lat, lng], {
+                    radius: 5,
+                    fillColor: color,
+                    color: '#fff',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
+
+                const popupContent = `
+                    <div class="custom-popup">
+                        <h6>${item.location || 'Onbekende locatie'}</h6>
+                        <p><strong>Type:</strong> <span style="color:${color}">${item.litterType || 'Onbekend'}</span></p>
+                        <p><strong>Tijd:</strong> ${item.timestamp || 'Onbekend'}</p>
+                        <p><strong>Coördinaten:</strong> ${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}</p>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                markersLayer.addLayer(marker);
+            });
+
+            if (trashData.length > 1000) {
+                map.setZoom(14);
+            }
+        } catch {}
+    };
+
+
+
+    // Heatmap
+
+    // Opstarten HeatMap
+    window.initializeHeatMap = function() {
+        try {
+            map = L.heatMap('heatMap').setView([51.5861, 4.7767], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(heatMap);
+
+            heatMapMarkersLayer = L.layerGroup().addTo(heatMap);
+        } catch {}
+    };
+
+    // Update HeatMap
+    window.updateHeatMapMarkers = function(jsonData) {
+        try {
+            const trashData = JSON.parse(jsonData);
+
+            if (!heatMap || !heatMapMarkersLayer) {
+                return;
+            }
+
+            if (!Array.isArray(trashData) || trashData.length === 0) {
+                return;
+            }
+
+            heatMapMarkersLayer.clearLayers();
+
+            trashData.forEach((item, index) => {
+                if (typeof item.lat !== 'number' || typeof item.lng !== 'number') {
+                    return;
+                }
+
+                const color = litterTypeColors[item.litterType] || '#95a5a6';
+
+                const lat = item.lat + (Math.random() - 0.5) * 0.00002;
+                const lng = item.lng + (Math.random() - 0.5) * 0.00002;
+
+                const marker = L.circleMarker([lat, lng], {
+                    radius: 5,
+                    fillColor: color,
+                    color: '#fff',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
+
+                const popupContent = `
+                    <div class="custom-popup">
+                        <h6>${item.location || 'Onbekende locatie'}</h6>
+                        <p><strong>Type:</strong> <span style="color:${color}">${item.litterType || 'Onbekend'}</span></p>
+                        <p><strong>Tijd:</strong> ${item.timestamp || 'Onbekend'}</p>
+                        <p><strong>Coördinaten:</strong> ${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}</p>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                heatMapMarkersLayer.addLayer(marker);
+            });
+
+            if (trashData.length > 1000) {
+                heatMap.setZoom(14);
+            }
+        } catch {}
+    };
+</script>
