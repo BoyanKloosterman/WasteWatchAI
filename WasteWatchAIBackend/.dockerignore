@@ -28,3 +28,23 @@ README.md
 !.git/config
 !.git/packed-refs
 !.git/refs/heads/**
+
+# Exclude test projects completely
+**/WasteWatchAIBackend.Tests/
+**/WasteWatchAIBackend.Tests/**
+WasteWatchAIBackend.Tests/
+WasteWatchAIBackend.Tests/**
+**/*Tests*/
+**/*Test*/
+*.Tests/
+*.Test/
+**/*.Tests.csproj
+**/*.Test.csproj
+
+# Standard excludes
+bin/
+obj/ 
+.vs/
+.vscode/
+*.user
+TestResults/
