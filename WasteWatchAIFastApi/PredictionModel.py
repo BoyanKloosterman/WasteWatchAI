@@ -15,6 +15,7 @@ from sklearn.metrics import r2_score
 import requests
 import warnings
 from fastapi import APIRouter
+import time
 
 router = APIRouter()
 
@@ -227,31 +228,95 @@ def get_seasonal_temperature(month):
         return 12.0
 
 def load_data_and_train_models():
-    """Load data and train both Decision Tree and Random Forest models"""
+    """Load REAL data and train both Decision Tree and Random Forest models with retry logic"""
     global dt_models, rf_models, dt_r2_scores, rf_r2_scores, available_features, weather_mapping
     
-    # API URLs
-    trashUrl = "http://host.docker.internal:8080/api/TrashItems/trash"
-    weerUrl = "http://host.docker.internal:8080/api/Weather/"
+    # Container startup retry configuration
+    max_retries = 60  # Increased for container startup
+    retry_delay = 10  # Longer delay for container startup
+    base_url = "http://host.docker.internal:8080"  # Since this URL works
     
-    try:
-        print("Loading trash data...")
+    working_base_url = None
+    trash_data = None
+    weather_data = None
+    
+    print(f"⏳ Waiting for API container to start at {base_url} (REAL DATA)")
+    print(f"🔄 Will retry {max_retries} times with {retry_delay}s intervals (max {max_retries * retry_delay / 60:.1f} minutes)")
+    
+    # Keep trying until the API container is ready
+    for attempt in range(1, max_retries + 1):
         try:
-            print(f"Making request to: {trashUrl}")
-            response = requests.get(trashUrl, timeout=10)
-            print(f"Response status: {response.status_code}")
+            print(f"🏗️  Real API check {attempt}/{max_retries} ({attempt * retry_delay}s elapsed)")
+            
+            # Test if the API container is responding - USE REAL TRASH ENDPOINT
+            trash_url = f"{base_url}/api/TrashItems/trash"  # REAL data endpoint (not dummy)
+            
+            print(f"   📡 Testing real API: {trash_url}")
+            
+            response = requests.get(trash_url, timeout=15)
             
             if response.status_code == 200:
-                # Convert response to DataFrame
                 trash_data = response.json()
-                trash = pd.DataFrame(trash_data)
-                print(f"✅ Loaded {len(trash)} trash records from API")
+                working_base_url = base_url
+                print(f"🎉 SUCCESS! Real API container is ready!")
+                print(f"✅ Loaded {len(trash_data)} REAL trash records")
+                break
             else:
-                raise Exception(f"API returned status {response.status_code}")
+                print(f"   ⚠️  Real API returned status {response.status_code} (container might be starting)")
+                
+        except requests.exceptions.ConnectionError as e:
+            print(f"   ⏳ Connection refused - API container not ready yet")
+        except requests.exceptions.Timeout as e:
+            print(f"   ⏳ Request timeout - API container might be starting")
+        except Exception as e:
+            print(f"   ❌ Unexpected error: {e}")
+        
+        # Wait before retry
+        if attempt < max_retries:
+            print(f"   💤 Waiting {retry_delay}s for API container to start...")
+            time.sleep(retry_delay)
+        else:
+            print("❌ Max wait time exceeded. API container didn't start in time.")
+            return False  # No fallback for real data - just fail
+    
+    # If we got trash data, try to get weather data
+    if working_base_url and trash_data:
+        try:
+            weather_url = f"{working_base_url}/api/Weather/"
+            print(f"🌤️ Getting real weather data: {weather_url}")
+            
+            weather_response = requests.get(weather_url, timeout=15)
+            
+            if weather_response.status_code == 200:
+                weather_data = weather_response.json()
+                print(f"✅ Real weather data loaded! {len(weather_data)} records")
+            else:
+                print(f"⚠️  Weather API returned status {weather_response.status_code}")
+                print("⚠️  Continuing with real trash data only")
                 
         except Exception as e:
-            print(f"❌ Error loading trash data: {e}")
-            raise e  # Re-raise om te zien wat er echt gebeurt
+            print(f"⚠️  Weather API error: {e}")
+            print("⚠️  Continuing with real trash data only")
+    
+    # Process the data (only real API data, no fallback)
+    try:
+        if not trash_data:
+            print("❌ No real data available - API container not responding")
+            return False
+        
+        print("📊 Processing REAL API data...")
+        trash = pd.DataFrame(trash_data)
+        
+        # Process weather data
+        if weather_data:
+            print("🌤️ Processing REAL weather data...")
+            weather_df = pd.DataFrame(weather_data)
+        else:
+            print("🌤️ No weather data available")
+            weather_df = pd.DataFrame()  # Empty DataFrame
+        
+        # Continue with existing data processing and model training...
+        print("🚀 Starting REAL model training...")
         
         # Convert timestamp to datetime
         trash['timestamp'] = pd.to_datetime(trash['timestamp'])
@@ -263,184 +328,107 @@ def load_data_and_train_models():
         trash['day'] = trash['timestamp'].dt.day
         trash['weekday'] = trash['timestamp'].dt.weekday
         
-        # Try to get weather data
-        try:
-            print("Fetching weather data...")
-            weather_response = requests.get(weerUrl, timeout=10)
-            if weather_response.status_code == 200:
-                weather_data = weather_response.json()
-                weather_df = pd.DataFrame(weather_data)
-                print(f"Loaded {len(weather_df)} weather records")
-                
-                if 'timestamp' in weather_df.columns:
-                    weather_df['datum'] = pd.to_datetime(weather_df['timestamp']).dt.date
-                    weather_df = weather_df.rename(columns={
-                        'temperature': 'temperatuur',
-                        'weatherDescription': 'weersverwachting'
-                    })
-                elif 'Timestamp' in weather_df.columns:
-                    weather_df['datum'] = pd.to_datetime(weather_df['Timestamp']).dt.date
-                    weather_df = weather_df.rename(columns={
-                        'Temperature': 'temperatuur',
-                        'WeatherDescription': 'weersverwachting'
-                    })
-                
-                # Merge weather data
-                trash = pd.merge(trash, weather_df[['datum', 'temperatuur', 'weersverwachting']], 
+        # Group by date and category
+        daily_summary = trash.groupby(['datum', 'litterType']).size().reset_index(name='count')
+        daily_data = daily_summary.pivot(index='datum', columns='litterType', values='count').fillna(0)
+        daily_data = daily_data.reset_index()
+        
+        # Add location data (use mean coordinates)
+        daily_data['latitude'] = trash.groupby('datum')['latitude'].mean().values
+        daily_data['longitude'] = trash.groupby('datum')['longitude'].mean().values
+        
+        # Add date features
+        daily_data['year'] = pd.to_datetime(daily_data['datum']).dt.year
+        daily_data['month'] = pd.to_datetime(daily_data['datum']).dt.month
+        daily_data['day'] = pd.to_datetime(daily_data['datum']).dt.day
+        daily_data['weekday'] = pd.to_datetime(daily_data['datum']).dt.weekday
+        
+        # Merge weather data if available
+        if len(weather_df) > 0:
+            print("🔗 Merging weather data...")
+            # Prepare weather data
+            if 'timestamp' in weather_df.columns:
+                weather_df['datum'] = pd.to_datetime(weather_df['timestamp']).dt.date
+                weather_df = weather_df.rename(columns={
+                    'temperature': 'temperatuur',
+                    'weatherDescription': 'weersverwachting'
+                })
+            elif 'Timestamp' in weather_df.columns:
+                weather_df['datum'] = pd.to_datetime(weather_df['Timestamp']).dt.date
+                weather_df = weather_df.rename(columns={
+                    'Temperature': 'temperatuur',
+                    'WeatherDescription': 'weersverwachting'
+                })
+            
+            # Merge weather data
+            daily_data = pd.merge(daily_data, weather_df[['datum', 'temperatuur', 'weersverwachting']], 
                                on='datum', how='left')
-                print("Weather data merged successfully")
-        except Exception as e:
-            print(f"Weather API failed: {e}. Using dummy weather data.")
-            # Use dummy weather data if API fails
-            trash['temperatuur'] = 15.0
-            trash['weersverwachting'] = 'Bewolkt'
+            print("✅ Weather data merged successfully")
         
-        # Fill missing weather data
-        trash['temperatuur'] = trash['temperatuur'].fillna(15.0)
-        trash['weersverwachting'] = trash['weersverwachting'].fillna('Bewolkt')
+        # Fill missing weather data with defaults (no fallback generation)
+        daily_data['temperatuur'] = daily_data['temperatuur'].fillna(15.0)
+        daily_data['weersverwachting'] = daily_data['weersverwachting'].fillna('Bewolkt')
         
-        # Create daily dataset with categories
-        if 'litterType' in trash.columns:
-            daily_waste_by_category = trash.groupby(['datum', 'litterType']).size().unstack(fill_value=0)
-            
-            # Map categories to standardized names
-            category_mapping = {}
-            for col in daily_waste_by_category.columns:
-                col_lower = col.lower()
-                if 'plastic' in col_lower:
-                    category_mapping[col] = 'Plastic'
-                elif 'paper' in col_lower or 'papier' in col_lower:
-                    category_mapping[col] = 'Papier'
-                elif 'organic' in col_lower or 'organisch' in col_lower or 'bio' in col_lower:
-                    category_mapping[col] = 'Organisch'
-                elif 'glass' in col_lower or 'glas' in col_lower:
-                    category_mapping[col] = 'Glas'
-                else:
-                    category_mapping[col] = 'Overig'
-            
-            daily_waste_by_category = daily_waste_by_category.rename(columns=category_mapping)
-            
-            # Combine duplicate categories
-            if len(set(category_mapping.values())) < len(category_mapping):
-                daily_waste_by_category = daily_waste_by_category.groupby(level=0, axis=1).sum()
-            
-            expected_categories = ['Plastic', 'Papier', 'Organisch', 'Glas']
-            for cat in expected_categories:
-                if cat not in daily_waste_by_category.columns:
-                    daily_waste_by_category[cat] = 0
-            
-            daily_waste_by_category = daily_waste_by_category[expected_categories]
-            # Voeg totaal_afval toe
-            daily_waste_by_category['totaal_afval'] = daily_waste_by_category.sum(axis=1)
-        else:
-            daily_waste_by_category = pd.DataFrame()
-            expected_categories = ['Plastic', 'Papier', 'Organisch', 'Glas']
-            for cat in expected_categories:
-                daily_waste_by_category[cat] = 0
-            daily_waste_by_category['totaal_afval'] = 0
-        
-        # Create aggregation dictionary
-        agg_dict = {
-            'latitude': 'median',
-            'longitude': 'median',
-            'year': 'first',
-            'month': 'first',
-            'day': 'first',
-            'weekday': 'first',
-            'hour': 'mean',
-            'temperatuur': 'mean',
-            'weersverwachting': 'first'
-        }
-        
-        # Aggregate features per day
-        daily_features = trash.groupby('datum').agg(agg_dict).reset_index()
+        # Add calculated features
+        daily_data['is_weekend'] = (daily_data['weekday'] >= 5).astype(int)
+        daily_data['seizoen'] = daily_data['month'].map({
+            12: 0, 1: 0, 2: 0,
+            3: 1, 4: 1, 5: 1,
+            6: 2, 7: 2, 8: 2,
+            9: 3, 10: 3, 11: 3
+        })
         
         # Weather mapping
         weather_mapping = {
-            'Zonnig': 0,
-            'Gedeeltelijk bewolkt': 1,
-            'Bewolkt': 2,
-            'Regenachtig': 3,
-            'Regen': 3,
-            'Lichte motregen': 3,
-            'Motregen': 3,
-            'Onweer': 4,
-            'Sneeuw': 5,
-            'Mistig': 6,
-            'Onbekend': 1
+            'Zonnig': 0, 'Gedeeltelijk bewolkt': 1, 'Bewolkt': 2,
+            'Regenachtig': 3, 'Onweer': 4, 'Sneeuw': 5, 'Mistig': 6, 'Onbekend': 1
         }
         
-        daily_features['weersverwachting_num'] = daily_features['weersverwachting'].map(weather_mapping).fillna(1)
+        daily_data['weer_numeriek'] = daily_data['weersverwachting'].map(weather_mapping).fillna(1)
         
-        # Combine features with waste counts
-        daily_data = pd.merge(daily_features, daily_waste_by_category.reset_index(), on='datum')
+        # Define available features
+        available_features = [
+            'latitude', 'longitude', 'year', 'month', 'day', 'weekday',
+            'temperatuur', 'weer_numeriek', 'is_weekend', 'seizoen'
+        ]
         
-        # Add extra features
-        daily_data['is_weekend'] = (daily_data['weekday'] >= 5).astype(int)
-        daily_data['seizoen'] = daily_data['month'].map({
-            12: 0, 1: 0, 2: 0,  # Winter
-            3: 1, 4: 1, 5: 1,    # Lente  
-            6: 2, 7: 2, 8: 2,    # Zomer
-            9: 3, 10: 3, 11: 3   # Herfst
-        })
-        
-        # Define features
-        features = ['latitude', 'longitude', 'year', 'month', 'day', 'weekday',
-                   'temperatuur', 'weersverwachting_num', 'is_weekend', 'seizoen']
-        
-        available_features = [f for f in features if f in daily_data.columns]
-        print(f"Available features: {available_features}")
-        
-        # Train models for each target (inclusief totaal_afval)
+        # Target categories
         targets = ['Plastic', 'Papier', 'Organisch', 'Glas']
         
-        print("Training models...")
+        print(f"🎯 Training REAL models for {len(targets)} waste categories...")
+        print(f"📊 Using {len(daily_data)} days of REAL data")
+        
+        # Train models for each category
         for target_name in targets:
             if target_name not in daily_data.columns:
-                print(f"Warning: Target {target_name} not found in data")
+                print(f"⚠️  Target {target_name} not found in real data, skipping")
                 continue
-                
+            
             target = daily_data[target_name]
             
             # Skip if target has no variance
             if target.std() == 0:
-                print(f"Warning: Target {target_name} has no variance, skipping")
+                print(f"⚠️  Target {target_name} has no variance, skipping")
                 continue
             
-            # Train-test split - gebruik numpy arrays om feature name warnings te vermijden
+            # Train-test split
             X_train, X_test, y_train, y_test = train_test_split(
-                daily_data[available_features].values,  # Use .values to get numpy array
-                target.values,  # Use .values to get numpy array
+                daily_data[available_features].values,
+                target.values,
                 test_size=0.3, random_state=42
             )
             
             # Train Decision Tree
-            dt = DecisionTreeRegressor(max_depth=2, random_state=42)
+            dt = DecisionTreeRegressor(max_depth=5, random_state=42)
             dt.fit(X_train, y_train)
             dt_pred = dt.predict(X_test)
             dt_r2 = r2_score(y_test, dt_pred)
             
-            # Calculate Decision Tree confidence on test set
-            dt_confidence_scores = []
-            for i in range(min(10, len(X_test))):  # Sample van 10 voor snelheid
-                single_input = X_test[i:i+1]  # Numpy array slice
-                dt_conf = calculate_prediction_confidence(dt, single_input, target_name)
-                dt_confidence_scores.append(dt_conf)
-            dt_avg_confidence = np.mean(dt_confidence_scores)
-
             # Train Random Forest
-            rf = RandomForestRegressor(n_estimators=1000, max_depth=5, random_state=42, )
+            rf = RandomForestRegressor(n_estimators=100, max_depth=8, random_state=42)
             rf.fit(X_train, y_train)
             rf_pred = rf.predict(X_test)
             rf_r2 = r2_score(y_test, rf_pred)
-            
-            # Calculate Random Forest confidence on test set
-            rf_confidence_scores = []
-            for i in range(min(10, len(X_test))):  # Sample van 10 voor snelheid
-                single_input = X_test[i:i+1]  # Numpy array slice
-                rf_conf = calculate_prediction_confidence(rf, single_input, target_name)
-                rf_confidence_scores.append(rf_conf)
-            rf_avg_confidence = np.mean(rf_confidence_scores)
             
             # Store models and scores
             dt_models[target_name] = dt
@@ -448,15 +436,13 @@ def load_data_and_train_models():
             dt_r2_scores[target_name] = max(0, dt_r2)
             rf_r2_scores[target_name] = max(0, rf_r2)
             
-            print(f"  {target_name}:")
-            print(f"    Decision Tree:  R²={dt_r2:.3f}, Avg Confidence={dt_avg_confidence:.3f}")
-            print(f"    Random Forest:  R²={rf_r2:.3f}, Avg Confidence={rf_avg_confidence:.3f}")
+            print(f"  ✅ {target_name}: DT R²={dt_r2:.3f}, RF R²={rf_r2:.3f}")
         
-        print(f"Successfully trained models for {len(dt_models)} targets")
+        print(f"🎉 REAL model training completed! Trained {len(dt_models)} models")
         return True
         
     except Exception as e:
-        print(f"Error loading data and training models: {e}")
+        print(f"❌ Error in REAL model training: {e}")
         import traceback
         traceback.print_exc()
         return False
