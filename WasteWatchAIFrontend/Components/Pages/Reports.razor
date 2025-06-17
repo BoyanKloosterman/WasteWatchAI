@@ -15,7 +15,7 @@
         <h1>
             Reports
         </h1>
-        <div> 
+        <div>
             <button class="btn btn-success btn-lg" @onclick="ExportData" disabled="@isExporting">
                 @if (isExporting)
                 {
@@ -61,16 +61,23 @@
                     <ul class="nav nav-tabs mb-3" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @(activeTab == "week" ? "active" : "")"
-                            @onclick='() => SetActiveTab("week")'
-                            type="button" role="tab">
+                                    @onclick='() => SetActiveTab("week")'
+                                    type="button" role="tab">
                                 Week
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @(activeTab == "month" ? "active" : "")"
-                            @onclick='() => SetActiveTab("month")'
-                            type="button" role="tab">
+                                    @onclick='() => SetActiveTab("month")'
+                                    type="button" role="tab">
                                 Maand
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(activeTab == "trends" ? "active" : "")"
+                                    @onclick='() => SetActiveTab("trends")'
+                                    type="button" role="tab">
+                                Trends per Type
                             </button>
                         </li>
                     </ul>
@@ -86,11 +93,17 @@
                                 <canvas id="trashChartMonthly"></canvas>
                             </div>
                         </div>
+                        <div class="tab-pane fade @(activeTab == "trends" ? "show active" : "")" role="tabpanel">
+                            <div class="chart-container">
+                                <canvas id="monthlyTrendsChart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card shadow-sm">
@@ -98,15 +111,15 @@
                     <ul class="nav nav-tabs mb-3" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @(benchmarkTab == "month" ? "active" : "")"
-                            @onclick='() => SetBenchmarkTab("month")'
-                            type="button">
+                                    @onclick='() => SetBenchmarkTab("month")'
+                                    type="button">
                                 Maand
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @(benchmarkTab == "week" ? "active" : "")"
-                            @onclick='() => SetBenchmarkTab("week")'
-                            type="button">
+                                    @onclick='() => SetBenchmarkTab("week")'
+                                    type="button">
                                 Week
                             </button>
                         </li>
@@ -347,8 +360,6 @@
     </div>
 </div>
 
-
-
 @code {
     private List<TrashItem> trashItems = new();
     private Dictionary<int, int> trashPerWeek = new();
@@ -386,15 +397,7 @@
                 Console.WriteLine("⚠️ Warning: PDF libraries not loaded. Export may not work.");
             }
 
-
-            if (activeTab == "week")
-            {
-                await JS.InvokeVoidAsync("drawTrashChart", proportionChangePerWeek);
-            }
-            else if (activeTab == "month")
-            {
-                await JS.InvokeVoidAsync("drawTrashChartMonthly", proportionChangePerMonth);
-            }
+            await RenderActiveChart();
         }
     }
 
@@ -405,35 +408,62 @@
         CalculateMonthlyTrashData();
         CalculateMonthlyTypeBenchmark();
         CalculateWeeklyTypeBenchmark();
-        
     }
 
-    private void SetActiveTab(string tab)
+    private async Task RenderActiveChart()
+    {
+        if (activeTab == "week")
+        {
+            await JS.InvokeVoidAsync("drawTrashChart", proportionChangePerWeek);
+        }
+        else if (activeTab == "month")
+        {
+            await JS.InvokeVoidAsync("drawTrashChartMonthly", proportionChangePerMonth);
+        }
+        else if (activeTab == "trends")
+        {
+            await RenderMonthlyTrendsChart();
+        }
+    }
+
+    private async Task SetActiveTab(string tab)
     {
         activeTab = tab;
         StateHasChanged();
-
-        if (tab == "week")
-        {
-            _ = JS.InvokeVoidAsync("drawTrashChart", proportionChangePerWeek);
-        }
-        else if (tab == "month")
-        {
-            _ = JS.InvokeVoidAsync("drawTrashChartMonthly", proportionChangePerMonth);
-        }
+        await RenderActiveChart();
     }
 
-	private void SetIsExporting(bool exporting)
-	{
-		isExporting = exporting;
-		StateHasChanged();
-	}
+    private async Task RenderMonthlyTrendsChart()
+    {
+        if (trashTypeCountPerMonth == null || trashTypeCountPerMonth.Count == 0)
+            return;
+
+        var monthlyBenchmarkData = trashTypeCountPerMonth
+            .OrderBy(kvp => kvp.Key)
+            .TakeLast(12)
+            .Select(kvp => new
+            {
+                MonthCode = kvp.Key,
+                MonthName = new DateTime(kvp.Key / 100, kvp.Key % 100, 1).ToString("MMMM yyyy", CultureInfo.GetCultureInfo("nl-NL")),
+                Plastic = kvp.Value.TryGetValue("Plastic", out var p) ? p : 0,
+                Papier = kvp.Value.TryGetValue("Papier", out var pa) ? pa : 0,
+                Glas = kvp.Value.TryGetValue("Glas", out var g) ? g : 0,
+                Organisch = kvp.Value.TryGetValue("Organisch", out var o) ? o : 0
+            }).ToList();
+
+        await JS.InvokeVoidAsync("drawMonthlyTrendsChart", monthlyBenchmarkData);
+    }
+
+    private void SetIsExporting(bool exporting)
+    {
+        isExporting = exporting;
+        StateHasChanged();
+    }
 
     private void SetBenchmarkTab(string tab)
     {
         benchmarkTab = tab;
     }
-
 
     private void CalculateWeeklyTrashData()
     {
@@ -519,11 +549,8 @@
         {
             Console.WriteLine($"Error loading trash data: {ex.Message}");
         }
-        finally
-        {
-
-        }
     }
+
     private void CalculateMonthlyTypeBenchmark()
     {
         if (trashItems == null || trashItems.Count == 0)
@@ -547,6 +574,7 @@
             totalTrashPerMonth[monthKey] = group.Count();
         }
     }
+
     private void CalculateWeeklyTypeBenchmark()
     {
         if (trashItems == null || trashItems.Count == 0)
@@ -570,7 +598,6 @@
             totalTrashPerWeek[weekKey] = group.Count();
         }
     }
-
 
     private async Task ExportData()
     {
