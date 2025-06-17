@@ -1,0 +1,706 @@
+﻿@page "/reports"
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@using System.ComponentModel.DataAnnotations
+@using WasteWatchAIFrontend.Models
+@using System.Text.Json.Serialization;
+@using System.Text.Json;
+@inject IHttpClientFactory HttpClientFactory
+@inject IJSRuntime JS
+@using System.Globalization;
+
+<PageTitle>Reports</PageTitle>
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            Reports
+        </h1>
+        <div>
+            <button class="btn btn-success btn-lg" @onclick="ExportData" disabled="@isExporting">
+                @if (isExporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Generating PDF...</span>
+                }
+                else
+                {
+                    <i class="fas fa-file-pdf me-2"></i>
+                    <span>Export</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-sm-6 col-lg-3 mb-3">
+            <div class="card h-100 shadow-sm" style="background-color: #F7F6FF; border: none;">
+                <div class="card-body">
+                    <h5 class="card-title">Gemiddelde verandering per week:</h5>
+                    <p class="card-text display-6 fw-bold">@averageChange.ToString("0.##")%</p>
+                    @if (averageChange > 0)
+                    {
+                        <p class="text-danger fw-bold">Increase</p>
+                    }
+                    else if (averageChange < 0)
+                    {
+                        <p class="text-success fw-bold">Reduction</p>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No change</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(activeTab == "week" ? "active" : "")"
+                                    @onclick='() => SetActiveTab("week")'
+                                    type="button" role="tab">
+                                Week
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(activeTab == "month" ? "active" : "")"
+                                    @onclick='() => SetActiveTab("month")'
+                                    type="button" role="tab">
+                                Maand
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(activeTab == "trends" ? "active" : "")"
+                                    @onclick='() => SetActiveTab("trends")'
+                                    type="button" role="tab">
+                                Trends per Type
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane fade @(activeTab == "week" ? "show active" : "")" role="tabpanel">
+                            <div class="chart-container">
+                                <canvas id="trashChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade @(activeTab == "month" ? "show active" : "")" role="tabpanel">
+                            <div class="chart-container">
+                                <canvas id="trashChartMonthly"></canvas>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade @(activeTab == "trends" ? "show active" : "")" role="tabpanel">
+                            <div class="chart-container">
+                                <canvas id="monthlyTrendsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(benchmarkTab == "month" ? "active" : "")"
+                                    @onclick='() => SetBenchmarkTab("month")'
+                                    type="button">
+                                Maand
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(benchmarkTab == "week" ? "active" : "")"
+                                    @onclick='() => SetBenchmarkTab("week")'
+                                    type="button">
+                                Week
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- Monthly Tab -->
+                        <div class="tab-pane fade @(benchmarkTab == "month" ? "show active" : "")">
+                            <h4 class="mt-4">Benchmarking per maand</h4>
+
+                            <!-- Desktop Table -->
+                            <div class="d-none d-lg-block">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Maand</th>
+                                                <th>Plastic</th>
+                                                <th>Papier</th>
+                                                <th>Glas</th>
+                                                <th>Organisch</th>
+                                                <th>Totaal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var month in trashTypeCountPerMonth.Keys.OrderBy(k => k))
+                                            {
+                                                var typeCounts = trashTypeCountPerMonth[month];
+                                                var total = totalTrashPerMonth[month];
+                                                string monthName = new DateTime(month / 100, month % 100, 1).ToString("MMMM yyyy", CultureInfo.GetCultureInfo("nl-NL"));
+
+                                                int plastic = typeCounts.TryGetValue("Plastic", out var p) ? p : 0;
+                                                int papier = typeCounts.TryGetValue("Papier", out var pa) ? pa : 0;
+                                                int glas = typeCounts.TryGetValue("Glas", out var g) ? g : 0;
+                                                int organisch = typeCounts.TryGetValue("Organisch", out var o) ? o : 0;
+
+                                                <tr>
+                                                    <td><strong>@monthName</strong></td>
+                                                    <td>@plastic</td>
+                                                    <td>@papier</td>
+                                                    <td>@glas</td>
+                                                    <td>@organisch</td>
+                                                    <td><strong>@total</strong></td>
+                                                </tr>
+                                                <tr class="table-secondary">
+                                                    <td><em>Percentage</em></td>
+                                                    <td>@((plastic * 100.0 / total).ToString("0.#"))%</td>
+                                                    <td>@((papier * 100.0 / total).ToString("0.#"))%</td>
+                                                    <td>@((glas * 100.0 / total).ToString("0.#"))%</td>
+                                                    <td>@((organisch * 100.0 / total).ToString("0.#"))%</td>
+                                                    <td><strong>100%</strong></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Mobile Cards -->
+                            <div class="d-lg-none">
+                                @foreach (var month in trashTypeCountPerMonth.Keys.OrderBy(k => k))
+                                {
+                                    var typeCounts = trashTypeCountPerMonth[month];
+                                    var total = totalTrashPerMonth[month];
+                                    string monthName = new DateTime(month / 100, month % 100, 1).ToString("MMMM yyyy", CultureInfo.GetCultureInfo("nl-NL"));
+
+                                    int plastic = typeCounts.TryGetValue("Plastic", out var p) ? p : 0;
+                                    int papier = typeCounts.TryGetValue("Papier", out var pa) ? pa : 0;
+                                    int glas = typeCounts.TryGetValue("Glas", out var g) ? g : 0;
+                                    int organisch = typeCounts.TryGetValue("Organisch", out var o) ? o : 0;
+
+                                    <div class="card mb-3 border-start border-primary border-3">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0 fw-bold">@monthName</h6>
+                                            <small class="text-muted">Totaal: @total items</small>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                                        <span class="fw-medium">🥤 Plastic:</span>
+                                                        <div class="text-end">
+                                                            <div>@plastic</div>
+                                                            <small class="text-muted">@((plastic * 100.0 / total).ToString("0.#"))%</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                                        <span class="fw-medium">📄 Papier:</span>
+                                                        <div class="text-end">
+                                                            <div>@papier</div>
+                                                            <small class="text-muted">@((papier * 100.0 / total).ToString("0.#"))%</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                                        <span class="fw-medium">🍶 Glas:</span>
+                                                        <div class="text-end">
+                                                            <div>@glas</div>
+                                                            <small class="text-muted">@((glas * 100.0 / total).ToString("0.#"))%</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                                        <span class="fw-medium">🥬 Organisch:</span>
+                                                        <div class="text-end">
+                                                            <div>@organisch</div>
+                                                            <small class="text-muted">@((organisch * 100.0 / total).ToString("0.#"))%</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Weekly Tab -->
+                        <div class="tab-pane fade @(benchmarkTab == "week" ? "show active" : "")">
+                            <h4 class="mt-4">Benchmarking per week</h4>
+
+                            <!-- Desktop Table -->
+                            <div class="d-none d-lg-block">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Week</th>
+                                                <th>Plastic</th>
+                                                <th>Papier</th>
+                                                <th>Glas</th>
+                                                <th>Organisch</th>
+                                                <th>Totaal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var week in trashTypeCountPerWeek.Keys.OrderBy(k => k))
+                                            {
+                                                var typeCounts = trashTypeCountPerWeek[week];
+                                                var total = totalTrashPerWeek[week];
+
+                                                int plastic = typeCounts.TryGetValue("Plastic", out var p) ? p : 0;
+                                                int papier = typeCounts.TryGetValue("Papier", out var pa) ? pa : 0;
+                                                int glas = typeCounts.TryGetValue("Glas", out var g) ? g : 0;
+                                                int organisch = typeCounts.TryGetValue("Organisch", out var o) ? o : 0;
+
+                                                <tr>
+                                                    <td><strong>Week @week</strong></td>
+                                                    <td>@plastic</td>
+                                                    <td>@papier</td>
+                                                    <td>@glas</td>
+                                                    <td>@organisch</td>
+                                                    <td><strong>@total</strong></td>
+                                                </tr>
+                                                <tr class="table-secondary">
+                                                    <td><em>Percentage</em></td>
+                                                    <td>@((plastic * 100.0 / total).ToString("0.#"))%</td>
+                                                    <td>@((papier * 100.0 / total).ToString("0.#"))%</td>
+                                                    <td>@((glas * 100.0 / total).ToString("0.#"))%</td>
+                                                    <td>@((organisch * 100.0 / total).ToString("0.#"))%</td>
+                                                    <td><strong>100%</strong></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Mobile Cards -->
+                            <div class="d-lg-none">
+                                @foreach (var week in trashTypeCountPerWeek.Keys.OrderBy(k => k))
+                                {
+                                    var typeCounts = trashTypeCountPerWeek[week];
+                                    var total = totalTrashPerWeek[week];
+
+                                    int plastic = typeCounts.TryGetValue("Plastic", out var p) ? p : 0;
+                                    int papier = typeCounts.TryGetValue("Papier", out var pa) ? pa : 0;
+                                    int glas = typeCounts.TryGetValue("Glas", out var g) ? g : 0;
+                                    int organisch = typeCounts.TryGetValue("Organisch", out var o) ? o : 0;
+
+                                    <div class="card mb-3 border-start border-success border-3">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0 fw-bold">Week @week</h6>
+                                            <small class="text-muted">Totaal: @total items</small>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                                        <span class="fw-medium">🥤 Plastic:</span>
+                                                        <div class="text-end">
+                                                            <div>@plastic</div>
+                                                            <small class="text-muted">@((plastic * 100.0 / total).ToString("0.#"))%</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                                        <span class="fw-medium">📄 Papier:</span>
+                                                        <div class="text-end">
+                                                            <div>@papier</div>
+                                                            <small class="text-muted">@((papier * 100.0 / total).ToString("0.#"))%</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                                        <span class="fw-medium">🍶 Glas:</span>
+                                                        <div class="text-end">
+                                                            <div>@glas</div>
+                                                            <small class="text-muted">@((glas * 100.0 / total).ToString("0.#"))%</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                                        <span class="fw-medium">🥬 Organisch:</span>
+                                                        <div class="text-end">
+                                                            <div>@organisch</div>
+                                                            <small class="text-muted">@((organisch * 100.0 / total).ToString("0.#"))%</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<TrashItem> trashItems = new();
+    private Dictionary<int, int> trashPerWeek = new();
+    private Dictionary<int, double> proportionChangePerWeek = new();
+    private Dictionary<int, int> trashPerMonth = new();
+    private Dictionary<int, double> proportionChangePerMonth = new();
+    private Dictionary<int, Dictionary<string, int>> trashTypeCountPerMonth = new();
+    private Dictionary<int, int> totalTrashPerMonth = new();
+    private Dictionary<int, Dictionary<string, int>> trashTypeCountPerWeek = new();
+    private Dictionary<int, int> totalTrashPerWeek = new();
+    private double averageChange;
+    private string activeTab = "week";
+    private string benchmarkTab = "month";
+    private bool isExporting = false;
+
+    public class WeeklyTrashData
+    {
+        public int WeekNumber { get; set; }
+        public int TrashCount { get; set; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadDummyTrashData();
+            CalculateWeeklyTrashData();
+            CalculateMonthlyTrashData();
+            CalculateMonthlyTypeBenchmark();
+            CalculateWeeklyTypeBenchmark();
+
+            var pdfLibrariesLoaded = await CheckPDFLibrariesAsync();
+            if (!pdfLibrariesLoaded)
+            {
+                Console.WriteLine("⚠️ Warning: PDF libraries not loaded. Export may not work.");
+            }
+
+            await RenderActiveChart();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDummyTrashData();
+        CalculateWeeklyTrashData();
+        CalculateMonthlyTrashData();
+        CalculateMonthlyTypeBenchmark();
+        CalculateWeeklyTypeBenchmark();
+    }
+
+    private async Task RenderActiveChart()
+    {
+        if (activeTab == "week")
+        {
+            await JS.InvokeVoidAsync("drawTrashChart", proportionChangePerWeek);
+        }
+        else if (activeTab == "month")
+        {
+            await JS.InvokeVoidAsync("drawTrashChartMonthly", proportionChangePerMonth);
+        }
+        else if (activeTab == "trends")
+        {
+            await RenderMonthlyTrendsChart();
+        }
+    }
+
+    private async Task SetActiveTab(string tab)
+    {
+        activeTab = tab;
+        StateHasChanged();
+        await RenderActiveChart();
+    }
+
+    private async Task RenderMonthlyTrendsChart()
+    {
+        if (trashTypeCountPerMonth == null || trashTypeCountPerMonth.Count == 0)
+            return;
+
+        var monthlyBenchmarkData = trashTypeCountPerMonth
+            .OrderBy(kvp => kvp.Key)
+            .TakeLast(12)
+            .Select(kvp => new
+            {
+                MonthCode = kvp.Key,
+                MonthName = new DateTime(kvp.Key / 100, kvp.Key % 100, 1).ToString("MMMM yyyy", CultureInfo.GetCultureInfo("nl-NL")),
+                Plastic = kvp.Value.TryGetValue("Plastic", out var p) ? p : 0,
+                Papier = kvp.Value.TryGetValue("Papier", out var pa) ? pa : 0,
+                Glas = kvp.Value.TryGetValue("Glas", out var g) ? g : 0,
+                Organisch = kvp.Value.TryGetValue("Organisch", out var o) ? o : 0
+            }).ToList();
+
+        await JS.InvokeVoidAsync("drawMonthlyTrendsChart", monthlyBenchmarkData);
+    }
+
+    private void SetIsExporting(bool exporting)
+    {
+        isExporting = exporting;
+        StateHasChanged();
+    }
+
+    private void SetBenchmarkTab(string tab)
+    {
+        benchmarkTab = tab;
+    }
+
+    private void CalculateWeeklyTrashData()
+    {
+        if (trashItems == null || trashItems.Count == 0)
+            return;
+
+        trashPerWeek = trashItems
+            .GroupBy(t => ISOWeek.GetWeekOfYear(t.Timestamp))
+            .OrderBy(g => g.Key)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        int? previousWeekCount = null;
+        foreach (var week in trashPerWeek.Keys.OrderBy(k => k))
+        {
+            var current = trashPerWeek[week];
+            if (previousWeekCount.HasValue && previousWeekCount != 0)
+            {
+                var change = ((double)(current - previousWeekCount.Value) / previousWeekCount.Value) * 100;
+                proportionChangePerWeek[week] = change;
+            }
+            else
+            {
+                proportionChangePerWeek[week] = 0;
+            }
+            previousWeekCount = current;
+        }
+
+        proportionChangePerWeek = proportionChangePerWeek
+            .OrderBy(kvp => kvp.Key)
+            .Skip(Math.Max(0, proportionChangePerWeek.Count - 15))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+        if (proportionChangePerWeek.Count > 1)
+            averageChange = proportionChangePerWeek
+                .Where(kvp => kvp.Key != trashPerWeek.Keys.Min())
+                .Average(kvp => kvp.Value);
+    }
+
+    private void CalculateMonthlyTrashData()
+    {
+        if (trashItems == null || trashItems.Count == 0)
+            return;
+
+        var trashPerMonthTemp = trashItems
+            .GroupBy(t => t.Timestamp.Year * 100 + t.Timestamp.Month)
+            .OrderBy(g => g.Key)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        trashPerMonth = trashPerMonthTemp;
+
+        var sortedMonths = trashPerMonth.Keys.OrderBy(k => k).TakeLast(12).ToList();
+        int? previousMonthCount = null;
+        proportionChangePerMonth.Clear();
+
+        foreach (var month in sortedMonths)
+        {
+            var current = trashPerMonth[month];
+            if (previousMonthCount.HasValue && previousMonthCount != 0)
+            {
+                var change = ((double)(current - previousMonthCount.Value) / previousMonthCount.Value) * 100;
+                proportionChangePerMonth[month] = change;
+            }
+            else
+            {
+                proportionChangePerMonth[month] = 0;
+            }
+            previousMonthCount = current;
+        }
+    }
+
+    private async Task LoadDummyTrashData()
+    {
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
+            var response = await httpClient.GetAsync("api/trashitems/dummy");
+            if (response.IsSuccessStatusCode)
+            {
+                trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading trash data: {ex.Message}");
+        }
+    }
+
+    private void CalculateMonthlyTypeBenchmark()
+    {
+        if (trashItems == null || trashItems.Count == 0)
+            return;
+
+        trashTypeCountPerMonth.Clear();
+        totalTrashPerMonth.Clear();
+
+        var grouped = trashItems
+            .GroupBy(t => t.Timestamp.Year * 100 + t.Timestamp.Month);
+
+        foreach (var group in grouped)
+        {
+            var monthKey = group.Key;
+
+            var typeCounts = group
+                .GroupBy(t => t.LitterType)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            trashTypeCountPerMonth[monthKey] = typeCounts;
+            totalTrashPerMonth[monthKey] = group.Count();
+        }
+    }
+
+    private void CalculateWeeklyTypeBenchmark()
+    {
+        if (trashItems == null || trashItems.Count == 0)
+            return;
+
+        trashTypeCountPerWeek.Clear();
+        totalTrashPerWeek.Clear();
+
+        var grouped = trashItems
+            .GroupBy(t => ISOWeek.GetWeekOfYear(t.Timestamp));
+
+        foreach (var group in grouped)
+        {
+            var weekKey = group.Key;
+
+            var typeCounts = group
+                .GroupBy(t => t.LitterType)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            trashTypeCountPerWeek[weekKey] = typeCounts;
+            totalTrashPerWeek[weekKey] = group.Count();
+        }
+    }
+
+    private async Task ExportData()
+    {
+        isExporting = true;
+        StateHasChanged();
+
+        try
+        {
+            var exportData = new
+            {
+                GeneratedDate = DateTime.Now,
+                AverageWeeklyChange = averageChange,
+
+                WeeklyData = trashPerWeek
+                    .OrderBy(kvp => kvp.Key)
+                    .TakeLast(10)
+                    .Select(kvp => new
+                    {
+                        Week = kvp.Key,
+                        Count = kvp.Value,
+                        ProportionChange = proportionChangePerWeek.TryGetValue(kvp.Key, out var change) ? change : 0
+                    }).ToList(),
+
+                MonthlyData = trashPerMonth
+                    .OrderBy(kvp => kvp.Key)
+                    .TakeLast(12)
+                    .Select(kvp => new
+                    {
+                        MonthCode = kvp.Key,
+                        MonthName = new DateTime(kvp.Key / 100, kvp.Key % 100, 1).ToString("MMMM yyyy", CultureInfo.GetCultureInfo("nl-NL")),
+                        Count = kvp.Value,
+                        ProportionChange = proportionChangePerMonth.TryGetValue(kvp.Key, out var change) ? change : 0
+                    }).ToList(),
+
+                WeeklyBenchmark = trashTypeCountPerWeek
+                    .OrderBy(kvp => kvp.Key)
+                    .TakeLast(8)
+                    .Select(kvp => new
+                    {
+                        Week = kvp.Key,
+                        Plastic = kvp.Value.TryGetValue("Plastic", out var p) ? p : 0,
+                        Papier = kvp.Value.TryGetValue("Papier", out var pa) ? pa : 0,
+                        Glas = kvp.Value.TryGetValue("Glas", out var g) ? g : 0,
+                        Organisch = kvp.Value.TryGetValue("Organisch", out var o) ? o : 0,
+                        Total = totalTrashPerWeek.TryGetValue(kvp.Key, out var total) ? total : 0
+                    }).ToList(),
+
+                MonthlyBenchmark = trashTypeCountPerMonth
+                    .OrderBy(kvp => kvp.Key)
+                    .TakeLast(6) 
+                    .Select(kvp => new
+                    {
+                        MonthCode = kvp.Key,
+                        MonthName = new DateTime(kvp.Key / 100, kvp.Key % 100, 1).ToString("MMMM yyyy", CultureInfo.GetCultureInfo("nl-NL")),
+                        Plastic = kvp.Value.TryGetValue("Plastic", out var p) ? p : 0,
+                        Papier = kvp.Value.TryGetValue("Papier", out var pa) ? pa : 0,
+                        Glas = kvp.Value.TryGetValue("Glas", out var g) ? g : 0,
+                        Organisch = kvp.Value.TryGetValue("Organisch", out var o) ? o : 0,
+                        Total = totalTrashPerMonth.TryGetValue(kvp.Key, out var total) ? total : 0
+                    }).ToList()
+            };
+
+            Console.WriteLine("Starting PDF export...");
+
+            var success = await JS.InvokeAsync<bool>("exportAdvancedPDF", exportData);
+
+            if (success)
+            {
+                Console.WriteLine("✅ PDF export completed successfully!");
+            }
+            else
+            {
+                Console.WriteLine("❌ PDF export failed. Check browser console for details.");
+            }
+        }
+        catch (JSException jsEx)
+        {
+            Console.WriteLine($"❌ JavaScript error during PDF export: {jsEx.Message}");
+            Console.WriteLine($"Stack trace: {jsEx.StackTrace}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error preparing data for PDF export: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+        finally
+        {
+            isExporting = false;
+            StateHasChanged();
+        }
+    }
+
+
+    private async Task<bool> CheckPDFLibrariesAsync()
+    {
+        try
+        {
+            var isLoaded = await JS.InvokeAsync<bool>("eval", "typeof window.jspdf !== 'undefined' && typeof window.jspdf.jsPDF !== 'undefined'");
+            return isLoaded;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}
