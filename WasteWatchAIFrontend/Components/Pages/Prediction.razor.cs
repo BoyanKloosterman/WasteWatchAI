@@ -12,6 +12,13 @@ namespace WasteWatchAIFrontend.Components.Pages
 
         private PredictionResponse predictionResult = new();
 
+        private static readonly Dictionary<string, string> WasteTypeTranslations = new()
+        {
+            { "Plastic", "Plastic" },
+            { "Paper", "Papier" },
+            { "Organic", "Organisch" },
+            { "Glass", "Glas" }
+        };
 
         private DateTime ?selectedDate = DateTime.UtcNow.AddDays(1);
         private DateTime minDate = DateTime.Today.AddDays(1);      
@@ -28,6 +35,8 @@ namespace WasteWatchAIFrontend.Components.Pages
             return "bg-danger";
         }
 
+        
+
         private async Task ToggleDataMode()
         {
             isLoading = true;
@@ -37,6 +46,31 @@ namespace WasteWatchAIFrontend.Components.Pages
 
             isLoading = false;
             StateHasChanged();
+        }
+
+        private async Task ChangeDateAndPredict(int days)
+        {
+            if (selectedDate.HasValue)
+            {
+                var newDate = selectedDate.Value.AddDays(days);
+                if (newDate >= minDate && newDate <= maxDate)
+                {
+                    selectedDate = newDate;
+                    await HandlePrediction();
+                }
+            }
+        }
+
+        private async Task OnDateInputChangedAndPredict(ChangeEventArgs e)
+        {
+            if (DateTime.TryParse(e.Value?.ToString(), out var newDate))
+            {
+                if (newDate >= minDate && newDate <= maxDate)
+                {
+                    selectedDate = newDate;
+                    await HandlePrediction();
+                }
+            }
         }
 
         private async Task HandlePrediction()
@@ -109,9 +143,10 @@ namespace WasteWatchAIFrontend.Components.Pages
         private async Task InitializeCharts()
         {
             // Check if we're showing prediction results or initializing an empty chart
-            InitializePredictionChart();
+            await InitializePredictionChart();
+            await HandlePrediction();
         }
-
+        
         private async Task InitializePredictionChart()
         {
             try
