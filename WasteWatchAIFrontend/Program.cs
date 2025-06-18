@@ -18,6 +18,12 @@ builder.Services.AddHttpClient("WasteWatchAPI", client =>
     client.DefaultRequestHeaders.Add("Accept", "application/json");
 });
 
+builder.Services.AddHttpClient("FastAPI", client =>
+{
+    client.BaseAddress = new Uri("http://localhost:8000/"); // Replace with your FastAPI base URL
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
