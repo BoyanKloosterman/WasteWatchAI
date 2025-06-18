@@ -64,30 +64,26 @@
         </div>
     </div>
 
-
     @* De kaart *@
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title fw-bold mb-4">Afvalverdeling kaart</h5>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="card-title fw-bold mb-0">Interactieve kaart</h5>
+                        <button class="btn btn-outline-primary" @onclick="SwitchMapMode">
+                            Toon @(_useHeatMap ? "Markers" : "Heatmap")
+                        </button>
+                    </div>
+                    
                     <div id="wasteMap" style="height: 300px; width: 100%; border-radius: 0.375rem;"></div>
                 </div>
+                
+                
             </div>
         </div>
     </div>
-
-    @* De heatmap *@
-    @* <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title fw-bold mb-4">Heatmap</h5>
-                    <div id="heatMap" style="height: 300px; width: 100%; border-radius: 0.375rem;"></div>
-                </div>
-            </div>
-        </div>
-    </div> *@
 
 </div>
 
@@ -99,6 +95,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin=""></script>
+
+@* <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script> *@
 
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
@@ -162,6 +160,8 @@
     private string selectedLocation = "";
     private string selectedDateRange = "";
 
+    private bool _useHeatMap = false;
+
     public class LocationAlert
     {
         public string LocationName { get; set; } = string.Empty;
@@ -180,7 +180,6 @@
     private IJSObjectReference? _chartInstance;
     private IJSObjectReference? _mapModule;
     private bool _mapInitialized = false;
-    private bool _heatMapInitialized = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -193,9 +192,7 @@
             {
                 await LoadDummyTrashData();
                 CheckForHighPriorityAlerts();
-                await UpdateChart();
                 await UpdateMap();
-                await UpdateHeatMap();
                 StateHasChanged();
             });
         }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
@@ -209,7 +206,6 @@
             {
                 _chartModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
                     "import", "./chartInterop.js");
-                await UpdateChart();
                 await InitializeMap();
             }
             catch { }
@@ -230,11 +226,21 @@
 
             await JSRuntime.InvokeVoidAsync("initializeMap");
             _mapInitialized = true;
-            _heatMapInitialized = true;
             await Task.Delay(100);
             await UpdateMap();
-            await UpdateHeatMap();
+        }
+        catch { }
+    }
 
+    private async Task SwitchMapMode()
+    {
+        if (!_mapInitialized) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("toggleHeatMap");
+            await UpdateMap();
+
+            _useHeatMap = !_useHeatMap;
         }
         catch { }
     }
@@ -242,7 +248,6 @@
     private async Task UpdateMap()
     {
         if (!_mapInitialized) return;
-
         try
         {
             var filteredData = GetFilteredData();
@@ -257,56 +262,6 @@
 
             var jsonData = JsonSerializer.Serialize(mapData);
             await JSRuntime.InvokeVoidAsync("updateMapMarkers", jsonData);
-        }
-        catch { }
-    }
-
-    private async Task UpdateHeatMap()
-    {
-        if (!_heatMapInitialized) return;
-
-        try
-        {
-            var filteredData = GetFilteredData();
-            var mapData = filteredData.Select(item => new
-            {
-                lat = (double)item.Latitude,
-                lng = (double)item.Longitude,
-                litterType = item.LitterType,
-                timestamp = item.Timestamp.ToString("dd-MM-yyyy HH:mm"),
-                location = GetLocationName(item.Latitude, item.Longitude)
-            }).ToList();
-
-            // add heatmap configuration
-
-            var jsonData = JsonSerializer.Serialize(mapData);
-            await JSRuntime.InvokeVoidAsync("updateHeatMapMarkers", jsonData);
-        }
-        catch { }
-    }
-
-    private async Task UpdateChart()
-    {
-        try
-        {
-            if (_chartModule is not null)
-            {
-                if (_chartInstance is not null)
-                {
-                    await _chartInstance.InvokeVoidAsync("destroy");
-                    await _chartInstance.DisposeAsync();
-                    _chartInstance = null;
-                }
-
-                var counts = GetLitterTypeCounts();
-                if (counts.Any())
-                {
-                    _chartInstance = await _chartModule.InvokeAsync<IJSObjectReference>(
-                        "setupLitterTypeChart",
-                        counts.Keys.ToArray(),
-                        counts.Values.ToArray());
-                }
-            }
         }
         catch { }
     }
@@ -513,9 +468,7 @@
                         !string.IsNullOrEmpty(selectedLocation) ||
                         !string.IsNullOrEmpty(selectedDateRange);
 
-        await UpdateChart();
         await UpdateMap();
-        await UpdateHeatMap();
     }
 
     private List<LocationAlert> GetLocationAlerts()
@@ -645,156 +598,3 @@
         return locations[random.Next(locations.Length)];
     }
 }
-
-<script>
-    let map;
-    let markersLayer;
-
-    let heatMap;
-    let heatMapMarkersLayer;
-
-    const litterTypeColors = {
-        'Plastic': '#e74c3c',
-        'Papier': '#3498db',
-        'Glas': '#2ecc71',
-        'Organisch': '#f39c12'
-    };
-
-    // Hoofd-Kaart
-
-    // Opstarten Kaart
-    window.initializeMap = function() {
-        try {
-            map = L.map('wasteMap').setView([51.5861, 4.7767], 13);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
-
-            markersLayer = L.layerGroup().addTo(map);
-        } catch {}
-    };
-
-    // Update Kaart
-    window.updateMapMarkers = function(jsonData) {
-        try {
-            const trashData = JSON.parse(jsonData);
-
-            if (!map || !markersLayer) {
-                return;
-            }
-
-            if (!Array.isArray(trashData) || trashData.length === 0) {
-                return;
-            }
-
-            markersLayer.clearLayers();
-
-            trashData.forEach((item, index) => {
-                if (typeof item.lat !== 'number' || typeof item.lng !== 'number') {
-                    return;
-                }
-
-                const color = litterTypeColors[item.litterType] || '#95a5a6';
-
-                const lat = item.lat + (Math.random() - 0.5) * 0.00002;
-                const lng = item.lng + (Math.random() - 0.5) * 0.00002;
-
-                const marker = L.circleMarker([lat, lng], {
-                    radius: 5,
-                    fillColor: color,
-                    color: '#fff',
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                });
-
-                const popupContent = `
-                    <div class="custom-popup">
-                        <h6>${item.location || 'Onbekende locatie'}</h6>
-                        <p><strong>Type:</strong> <span style="color:${color}">${item.litterType || 'Onbekend'}</span></p>
-                        <p><strong>Tijd:</strong> ${item.timestamp || 'Onbekend'}</p>
-                        <p><strong>Coördinaten:</strong> ${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}</p>
-                    </div>
-                `;
-
-                marker.bindPopup(popupContent);
-                markersLayer.addLayer(marker);
-            });
-
-            if (trashData.length > 1000) {
-                map.setZoom(14);
-            }
-        } catch {}
-    };
-
-
-
-    // Heatmap
-
-    // Opstarten HeatMap
-    window.initializeHeatMap = function() {
-        try {
-            map = L.heatMap('heatMap').setView([51.5861, 4.7767], 13);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(heatMap);
-
-            heatMapMarkersLayer = L.layerGroup().addTo(heatMap);
-        } catch {}
-    };
-
-    // Update HeatMap
-    window.updateHeatMapMarkers = function(jsonData) {
-        try {
-            const trashData = JSON.parse(jsonData);
-
-            if (!heatMap || !heatMapMarkersLayer) {
-                return;
-            }
-
-            if (!Array.isArray(trashData) || trashData.length === 0) {
-                return;
-            }
-
-            heatMapMarkersLayer.clearLayers();
-
-            trashData.forEach((item, index) => {
-                if (typeof item.lat !== 'number' || typeof item.lng !== 'number') {
-                    return;
-                }
-
-                const color = litterTypeColors[item.litterType] || '#95a5a6';
-
-                const lat = item.lat + (Math.random() - 0.5) * 0.00002;
-                const lng = item.lng + (Math.random() - 0.5) * 0.00002;
-
-                const marker = L.circleMarker([lat, lng], {
-                    radius: 5,
-                    fillColor: color,
-                    color: '#fff',
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                });
-
-                const popupContent = `
-                    <div class="custom-popup">
-                        <h6>${item.location || 'Onbekende locatie'}</h6>
-                        <p><strong>Type:</strong> <span style="color:${color}">${item.litterType || 'Onbekend'}</span></p>
-                        <p><strong>Tijd:</strong> ${item.timestamp || 'Onbekend'}</p>
-                        <p><strong>Coördinaten:</strong> ${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}</p>
-                    </div>
-                `;
-
-                marker.bindPopup(popupContent);
-                heatMapMarkersLayer.addLayer(marker);
-            });
-
-            if (trashData.length > 1000) {
-                heatMap.setZoom(14);
-            }
-        } catch {}
-    };
-</script>
