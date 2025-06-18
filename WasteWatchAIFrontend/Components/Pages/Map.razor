@@ -184,14 +184,12 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadDummyTrashData();
-        CheckForHighPriorityAlerts();
 
         refreshTimer = new System.Threading.Timer(async _ =>
         {
             await InvokeAsync(async () =>
             {
                 await LoadDummyTrashData();
-                CheckForHighPriorityAlerts();
                 await UpdateMap();
                 StateHasChanged();
             });
@@ -343,34 +341,6 @@
             .Count();
     }
 
-    private void CheckForHighPriorityAlerts()
-    {
-        var highAlerts = GetLocationAlerts()
-            .Where(a => a.Priority == "Hoog" && !notifiedHighAlerts.Contains(a.LocationName))
-            .ToList();
-
-        if (highAlerts.Any())
-        {
-            foreach (var alert in highAlerts)
-            {
-                notifiedHighAlerts.Add(alert.LocationName);
-            }
-
-            var locations = string.Join(", ", highAlerts.Select(a => a.LocationName));
-            alertMessage = $"Hoog risico op locatie(s): {locations}";
-            showAlert = true;
-
-            Task.Delay(60000).ContinueWith(_ =>
-            {
-                InvokeAsync(() =>
-                {
-                    showAlert = false;
-                    StateHasChanged();
-                });
-            });
-        }
-    }
-
     public async void Dispose()
     {
         refreshTimer?.Dispose();
@@ -469,114 +439,6 @@
                         !string.IsNullOrEmpty(selectedDateRange);
 
         await UpdateMap();
-    }
-
-    private List<LocationAlert> GetLocationAlerts()
-    {
-        var dataToUse = GetFilteredData();
-
-        if (!dataToUse.Any())
-            return new List<LocationAlert>();
-
-        var now = DateTime.Now;
-        var oneHourAgo = now.AddHours(-1);
-        var twentyFourHoursAgo = now.AddHours(-24);
-
-        var locationGroups = dataToUse
-            .GroupBy(item => GetLocationName(item.Latitude, item.Longitude))
-            .ToList();
-
-        var alerts = new List<LocationAlert>();
-
-        foreach (var group in locationGroups)
-        {
-            var locationItems = group.ToList();
-
-            var lastHourItems = locationItems.Where(item =>
-                item.Timestamp >= oneHourAgo &&
-                item.Timestamp <= now).ToList();
-
-            var last24HourItems = locationItems.Where(item =>
-                item.Timestamp >= twentyFourHoursAgo &&
-                item.Timestamp <= now).ToList();
-
-            var alert = new LocationAlert
-                {
-                    LocationName = group.Key,
-                    CountLastHour = lastHourItems.Count,
-                    CountLast24Hours = last24HourItems.Count,
-                    TotalCount = locationItems.Count,
-                    LastAlert = locationItems.Where(item => item.Timestamp <= now).Any() ?
-                                               locationItems.Where(item => item.Timestamp <= now).Max(item => item.Timestamp) : null
-                };
-
-            if (alert.CountLastHour >= 3)
-            {
-                alert.Priority = "Hoog";
-            }
-            else if (alert.CountLastHour >= 1)
-            {
-                alert.Priority = "Gemiddeld";
-            }
-            else
-            {
-                alert.Priority = "Laag";
-            }
-
-            alerts.Add(alert);
-        }
-
-        return alerts;
-    }
-
-    private List<(string LitterType, double Percentage)> GetTopLitterTypes(int topCount = 2)
-    {
-        var dataToUse = GetFilteredData();
-
-        if (!dataToUse.Any())
-            return new List<(string LitterType, double Percentage)>();
-
-        var totalCount = dataToUse.Count;
-
-        var litterTypeCounts = dataToUse
-            .GroupBy(item => item.LitterType)
-            .Select(group => new
-            {
-                LitterType = group.Key,
-                Count = group.Count(),
-                Percentage = (double)group.Count() / totalCount * 100
-            })
-            .OrderByDescending(x => x.Count)
-            .Take(topCount)
-            .Select(x => (x.LitterType, x.Percentage))
-            .ToList();
-
-        return litterTypeCounts;
-    }
-
-    private List<(string LocationName, double Percentage)> GetTopLocations(int topCount = 2)
-    {
-        var dataToUse = GetFilteredData();
-
-        if (!dataToUse.Any())
-            return new List<(string LocationName, double Percentage)>();
-
-        var totalCount = dataToUse.Count;
-
-        var locationCounts = dataToUse
-            .GroupBy(item => GetLocationName(item.Latitude, item.Longitude))
-            .Select(group => new
-            {
-                LocationName = group.Key,
-                Count = group.Count(),
-                Percentage = (double)group.Count() / totalCount * 100
-            })
-            .OrderByDescending(x => x.Count)
-            .Take(topCount)
-            .Select(x => (x.LocationName, x.Percentage))
-            .ToList();
-
-        return locationCounts;
     }
 
     private string GetLocationName(float latitude, float longitude)

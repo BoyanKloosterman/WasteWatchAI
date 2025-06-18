@@ -8,11 +8,12 @@ let chasséParkLayer;
 let chasséveldLayer;
 let useHeatmap = false;
 
+
 const litterTypeColors = {
     'Plastic': '#e74c3c',
     'Papier': '#3498db',
-    'Glas': '#2ecc71',
-    'Organisch': '#f39c12'
+    'Glas': '#f39c12',
+    'Organisch': '#2ecc71'
 };
 
 // Opstarten Kaart
