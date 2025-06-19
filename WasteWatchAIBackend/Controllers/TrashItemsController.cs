@@ -19,14 +19,17 @@ namespace WasteWatchAIBackend.Controllers
 
         [HttpGet("trash")]
         public async Task<ActionResult<IEnumerable<TrashItem>>> GetTrashItems()
-        {           
-            return await _context.TrashItems.ToListAsync();
+        {
+            var trashItems = await _context.TrashItems.ToListAsync();
+            return Ok(trashItems);
         }
-
+        
         [HttpGet("dummy")]
         public async Task<ActionResult<IEnumerable<DummyTrashItem>>> GetDummyTrashItems()
         {
-            return await _context.DummyTrashItems.ToListAsync();
+            var dummyTrashItems = await _context.DummyTrashItems.ToListAsync();
+            return Ok(dummyTrashItems);
         }
+
     }
 }
