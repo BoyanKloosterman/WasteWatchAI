@@ -88,7 +88,7 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="card-title fw-bold mb-0">Filters</h5>
-                <small class="text-muted"><i class="fas fa-filter me-1"></i>Pas je view aan op wat je wilt zien</small>
+                <small class="text-muted"><i class="fas fa-filter me-1"></i>Filter op wat je wilt zien</small>
             </div>
             <div class="row g-3 align-items-end">
                 <div class="col-sm-6 col-md-4">
@@ -100,6 +100,7 @@
                         <option value="Glas">Glas</option>
                         <option value="Organisch">Organisch</option>
                     </select>
+                    <small class="text-muted">Filter op specifiek materiaal</small>
                 </div>
 
                 <div class="col-sm-6 col-md-4">
@@ -113,17 +114,19 @@
                         <option value="Chassé Park">Chassé Park</option>
                         <option value="Chasséveld">Chasséveld</option>
                     </select>
+                    <small class="text-muted">Selecteer een specifieke plek</small>
                 </div>
 
                 <div class="col-sm-6 col-md-4">
-                    <label class="form-label fw-bold">Datum</label>
+                    <label class="form-label fw-bold">Tijdsfilter</label>
                     <select class="form-select" @bind="selectedDateRange" @bind:after="OnFilterChanged">
-                        <option value="">Alle periodes</option>
-                        <option value="Vandaag">Vandaag</option>
-                        <option value="Deze week">Deze week</option>
-                        <option value="Deze maand">Deze maand</option>
-                        <option value="Dit jaar">Dit jaar</option>
+                        <option value="">Laatste 30 dagen</option>
+                        <option value="Vandaag">Vandaag (00:00 - nu)</option>
+                        <option value="Deze week">Deze week (zondag - nu)</option>
+                        <option value="Deze maand">Huidige maand (1e - vandaag)</option>
+                        <option value="Dit jaar">Huidig jaar (1 jan - vandaag)</option>
                     </select>
+                    <small class="text-muted">Selecteer een specifieke tijdsperiode</small>
                 </div>
             </div>
         </div>
