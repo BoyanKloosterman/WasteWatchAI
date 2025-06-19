@@ -24,7 +24,6 @@
                 }
                 else
                 {
-                    <i class="fas fa-file-pdf me-2"></i>
                     <span>Export</span>
                 }
             </button>
@@ -58,29 +57,55 @@
         <div class="col-md-12">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <ul class="nav nav-tabs mb-3" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link @(activeTab == "week" ? "active" : "")"
-                                    @onclick='() => SetActiveTab("week")'
-                                    type="button" role="tab">
-                                Week
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link @(activeTab == "month" ? "active" : "")"
-                                    @onclick='() => SetActiveTab("month")'
-                                    type="button" role="tab">
-                                Maand
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link @(activeTab == "trends" ? "active" : "")"
-                                    @onclick='() => SetActiveTab("trends")'
-                                    type="button" role="tab">
-                                Trends per Type
-                            </button>
-                        </li>
-                    </ul>
+                    <div class="d-flex justify-content-between">
+                        <ul class="nav nav-tabs mb-3" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(activeTab == "week" ? "active" : "")"
+                                        @onclick='() => SetActiveTab("week")'
+                                        type="button" role="tab">
+                                    Week
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(activeTab == "month" ? "active" : "")"
+                                        @onclick='() => SetActiveTab("month")'
+                                        type="button" role="tab">
+                                    Maand
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(activeTab == "trends" ? "active" : "")"
+                                        @onclick='() => SetActiveTab("trends")'
+                                        type="button" role="tab">
+                                    Trends per Type
+                                </button>
+                            </li>
+                        </ul>
+                            
+                        <div class="tab-content">
+                            <div class="tab-pane fade @(activeTab == "week" ? "show active" : "")" role="tabpanel">
+                                <i class="bi bi-question-circle-fill text-primary"
+                                   style="cursor: pointer;"
+                                   data-bs-toggle="popover"
+                                   data-bs-trigger="click"
+                                   data-bs-placement="top"
+                                   title="Uitleg grafiek"
+                                   data-bs-content="Deze grafiek toont de procentuele verandering in zwerfafval per week. Positief = toename, negatief = afname.">
+                                </i>
+                            </div>
+                            <div class="tab-pane fade @(activeTab == "month" ? "show active" : "")" role="tabpanel">
+                                <i class="bi bi-question-circle-fill text-primary"
+                                   style="cursor: pointer;"
+                                   data-bs-toggle="popover"
+                                   data-bs-trigger="click"
+                                   data-bs-placement="top"
+                                   title="Uitleg grafiek"
+                                   data-bs-content="Deze grafiek toont de procentuele verandering in zwerfafval per maand. Positief = toename, negatief = afname.">
+                                </i>
+                            </div>
+                        </div>
+                    </div>
+                    
 
                     <div class="tab-content">
                         <div class="tab-pane fade @(activeTab == "week" ? "show active" : "")" role="tabpanel">
@@ -110,17 +135,17 @@
                 <div class="card-body">
                     <ul class="nav nav-tabs mb-3" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link @(benchmarkTab == "month" ? "active" : "")"
-                                    @onclick='() => SetBenchmarkTab("month")'
+                            <button class="nav-link @(benchmarkTab == "week" ? "active" : "")"
+                                    @onclick='() => SetActiveTab("week")'
                                     type="button">
-                                Maand
+                                Week
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link @(benchmarkTab == "week" ? "active" : "")"
-                                    @onclick='() => SetBenchmarkTab("week")'
+                            <button class="nav-link @(benchmarkTab == "month" ? "active" : "")"
+                                    @onclick='() => SetActiveTab("month")'
                                     type="button">
-                                Week
+                                Maand
                             </button>
                         </li>
                     </ul>
@@ -359,7 +384,6 @@
         </div>
     </div>
 </div>
-
 @code {
     private List<TrashItem> trashItems = new();
     private Dictionary<int, int> trashPerWeek = new();
@@ -372,7 +396,7 @@
     private Dictionary<int, int> totalTrashPerWeek = new();
     private double averageChange;
     private string activeTab = "week";
-    private string benchmarkTab = "month";
+    private string benchmarkTab = "week";
     private bool isExporting = false;
 
     public class WeeklyTrashData
@@ -390,6 +414,7 @@
             CalculateMonthlyTrashData();
             CalculateMonthlyTypeBenchmark();
             CalculateWeeklyTypeBenchmark();
+            await JS.InvokeVoidAsync("initializePopovers");
 
             var pdfLibrariesLoaded = await CheckPDFLibrariesAsync();
             if (!pdfLibrariesLoaded)
@@ -429,10 +454,15 @@
     private async Task SetActiveTab(string tab)
     {
         activeTab = tab;
+
+        if (tab == "week" || tab == "month")
+        {
+            benchmarkTab = tab;
+        }
+
         StateHasChanged();
         await RenderActiveChart();
     }
-
     private async Task RenderMonthlyTrendsChart()
     {
         if (trashTypeCountPerMonth == null || trashTypeCountPerMonth.Count == 0)
