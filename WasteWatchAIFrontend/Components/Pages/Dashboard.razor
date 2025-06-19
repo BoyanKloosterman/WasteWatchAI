@@ -349,7 +349,7 @@
             try
             {
                 _chartModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                    "import", "./chartInterop.js");
+                    "import", $"./chartInterop.js?v={DateTime.Now.Ticks}");
                 await UpdateChart();
                 await InitializeMap();
             }

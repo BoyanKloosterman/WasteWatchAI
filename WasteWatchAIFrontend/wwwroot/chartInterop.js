@@ -1,5 +1,18 @@
-﻿export function setupLitterTypeChart(labels, data) {
+﻿// Dezelfde kleuren als de map
+const litterTypeColors = {
+    'Plastic': '#e74c3c',
+    'Papier': '#3498db',
+    'Glas': '#f39c12',
+    'Organisch': '#2ecc71'
+};
+
+export function setupLitterTypeChart(labels, data) {
     const ctx = document.getElementById('litterTypeChart').getContext('2d');
+
+    // Genereer achtergrondkleuren gebaseerd op de labels (100% opacity)
+    const backgroundColors = labels.map(label => {
+        return litterTypeColors[label] || '#95a5a6';
+    });
 
     return new Chart(ctx, {
         type: 'bar',
@@ -8,23 +21,8 @@
             datasets: [{
                 label: 'Aantal items',
                 data: data,
-                backgroundColor: [
-                    'rgba(243, 156, 18, 1)',
-                    'rgba(46, 204, 113, 1)',
-                    'rgba(52, 152, 219, 1)',
-                    'rgba(231, 76, 60, 1)',   
-                ],
-                borderColor: [
-                    'rgba(255, 107, 107, 1)',
-                    'rgba(54, 162, 235, 1)',
-                    'rgba(255, 206, 86, 1)',
-                    'rgba(75, 192, 192, 1)',
-                    'rgba(153, 102, 255, 1)',
-                    'rgba(255, 159, 64, 1)',
-                    'rgba(87, 206, 235, 1)',
-                    'rgba(255, 99, 132, 1)'
-                ],
-                borderWidth: 1
+                backgroundColor: backgroundColors,
+                borderWidth: 0
             }]
         },
         options: {
