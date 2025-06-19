@@ -4,6 +4,7 @@ let frequencyChart = null;
 let correlationChart = null;
 let weatherDistributionChart = null;
 let scatterChart = null;
+let predictionChart = null;
 
 // Initialize tooltips on page load
 document.addEventListener('DOMContentLoaded', function () {
@@ -60,6 +61,116 @@ window.initializeTypeDistributionChart = function (chartData) {
         console.error('Error initializing type distribution chart:', error);
     }
 };
+
+// Prediction Chart - Fixed implementation
+window.initializePredictionChart = function (chartData) {
+    // Debug logging
+    console.log('initializePredictionChart called with data:', JSON.stringify(chartData, null, 2));
+
+    const ctx = document.getElementById('predictionChart');
+    if (!ctx) {
+        console.error('predictionChart canvas element not found');
+        return;
+    }
+
+    // Destroy chart if no data
+    if (!chartData || !chartData.labels || chartData.labels.length === 0) {
+        if (predictionChart) {
+            predictionChart.destroy();
+            predictionChart = null;
+        }
+        ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+        return;
+    }
+
+    if (predictionChart) {
+        predictionChart.destroy();
+    }
+
+    try {
+        predictionChart = new Chart(ctx, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: chartData.datasets[0]?.label || 'Voorspelde afvalitems'
+                    },
+                    legend: {
+                        labels: {
+                            generateLabels: function (chart) {
+                                const dataset = chart.data.datasets[0];
+                                return chart.data.labels.map((label, i) => {
+                                    return {
+                                        text: label,
+                                        fillStyle: dataset.backgroundColor[i],
+                                        strokeStyle: dataset.borderColor[i],
+                                        lineWidth: dataset.borderWidth,
+                                        index: i
+                                    };
+                                });
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function (tooltipItems) {
+                                return tooltipItems[0].label;
+                            },
+                            label: function (context) {
+                                return `Aantal: ${context.parsed.y}`;
+                            },
+                            afterLabel: function (context) {
+                                // Return confidence if available
+                                if (chartData.confidenceLabels && chartData.confidenceLabels[context.dataIndex]) {
+                                    return chartData.confidenceLabels[context.dataIndex];
+                                }
+                                return '';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { display: false },
+                        ticks: {
+                            color: '#333333',
+                            font: {
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { display: true, color: 'rgba(0, 0, 0, 0.1)' },
+                        title: {
+                            display: true,
+                            text: 'Voorspeld aantal'
+                        }
+                    }
+                },
+                barPercentage: 0.7,       // Make bars wider
+                categoryPercentage: 0.8,  // Reduce gap between categories
+                layout: {
+                    padding: {
+                        top: 20,
+                        right: 20,
+                        bottom: 10,
+                        left: 10
+                    }
+                }
+            }
+        });
+        console.log('Prediction chart initialized successfully');
+    } catch (error) {
+        console.error('Error initializing prediction chart:', error);
+    }
+};
+
 
 
 // Frequency Chart
@@ -319,6 +430,7 @@ window.initializeScatterChart = function (chartData) {
 // Debug function to check if all functions are available
 window.checkChartFunctions = function () {
     console.log('Chart functions available:');
+    console.log('- initializePredictionChart:', typeof window.initializePredictionChart);
     console.log('- initializeTypeDistributionChart:', typeof window.initializeTypeDistributionChart);
     console.log('- initializeFrequencyChart:', typeof window.initializeFrequencyChart);
     console.log('- initializeCorrelationChart:', typeof window.initializeCorrelationChart);
@@ -353,6 +465,11 @@ window.destroyAllCharts = function () {
     if (scatterChart) {
         scatterChart.destroy();
         scatterChart = null;
+    }
+
+    if (predictionChart) {
+        predictionChart.destroy();
+        predictionChart = null;
     }
 
     console.log('All charts destroyed successfully');
