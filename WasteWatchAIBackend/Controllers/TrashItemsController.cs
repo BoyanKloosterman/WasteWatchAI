@@ -23,6 +23,7 @@ namespace WasteWatchAIBackend.Controllers
             var trashItems = await _context.TrashItems.ToListAsync();
             return Ok(trashItems);
         }
+        
         [HttpGet("dummy")]
         public async Task<ActionResult<IEnumerable<DummyTrashItem>>> GetDummyTrashItems()
         {
