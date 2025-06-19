@@ -1252,3 +1252,34 @@ window.exportAdvancedPDF = function (reportData) {
         return false;
     }
 };
+
+window.initializePopovers = () => {
+    let activePopover = null;
+
+    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+
+    popoverTriggerList.forEach((triggerEl) => {
+        const popover = new bootstrap.Popover(triggerEl);
+
+        triggerEl.addEventListener('click', function () {
+            if (activePopover && activePopover !== popover) {
+                activePopover.hide();
+            }
+
+            if (activePopover === popover) {
+                activePopover = null;
+            } else {
+                activePopover = popover;
+            }
+        });
+    });
+
+    document.querySelectorAll('.nav-link').forEach(tabEl => {
+        tabEl.addEventListener('click', function () {
+            if (activePopover) {
+                activePopover.hide();
+                activePopover = null;
+            }
+        });
+    });
+};
