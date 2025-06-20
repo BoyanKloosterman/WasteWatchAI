@@ -146,7 +146,7 @@ namespace WasteWatchAIFrontend.Components.Pages
                     return new bootstrap.Tooltip(tooltipTriggerEl);
                 });
             ");
-
+                await JS.InvokeVoidAsync("initializePopovers");
                 await InitializeCharts();
                 chartsNeedUpdate = false;
             }
