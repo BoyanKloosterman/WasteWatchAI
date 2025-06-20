@@ -136,21 +136,27 @@ namespace WasteWatchAIFrontend.Components.Pages
             isDataModeChanging = false; // Reset flag after mode change is complete
         }
 
-        protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            if (!isLoading && (firstRender || chartsNeedUpdate))
-            {
-                await JS.InvokeVoidAsync("eval", @"
-                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle=""tooltip""]'));
-                tooltipTriggerList.map(function (tooltipTriggerEl) {
-                    return new bootstrap.Tooltip(tooltipTriggerEl);
-                });
-            ");
-
-                await InitializeCharts();
-                chartsNeedUpdate = false;
-            }
-        }
+protected override async Task OnAfterRenderAsync(bool firstRender)
+{
+    if (!isLoading && (firstRender || chartsNeedUpdate))
+    {
+        await JS.InvokeVoidAsync("eval", @"
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle=""tooltip""]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        ");
+        await JS.InvokeVoidAsync("initializePopovers");
+        await InitializeCharts();
+        chartsNeedUpdate = false;
+    }
+    
+    if (correlationData != null && !isLoadingCorrelation)
+    {
+        await Task.Delay(100); 
+        await JS.InvokeVoidAsync("initializePopovers");
+    }
+}
 
         private async Task InitializeCharts()
         {
@@ -726,130 +732,134 @@ namespace WasteWatchAIFrontend.Components.Pages
         }
 
         private async Task InitializeCorrelationChart()
+{
+    if (correlationData?.ChartData == null)
+    {
+        Console.WriteLine("No correlation data available");
+        return;
+    }
+
+    Console.WriteLine("Starting chart initialization...");
+
+    // Wait for DOM elements to exist with retry mechanism
+    var maxRetries = 10;
+    var retryCount = 0;
+    bool elementsExist = false;
+
+    while (!elementsExist && retryCount < maxRetries)
+    {
+        await Task.Delay(200); // Wait 200ms between checks
+
+        try
         {
-            if (correlationData?.ChartData == null)
+            var correlationExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('correlationChart') !== null");
+            var weatherExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('weatherDistributionChart') !== null");
+            var scatterExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('scatterChart') !== null");
+
+            Console.WriteLine($"Retry {retryCount + 1}: Canvas elements exist - Correlation: {correlationExists}, Weather: {weatherExists}, Scatter: {scatterExists}");
+
+            if (correlationExists && weatherExists && scatterExists)
             {
-                Console.WriteLine("No correlation data available");
-                return;
-            }
-
-            Console.WriteLine("Starting chart initialization...");
-
-            // Wait for DOM elements to exist with retry mechanism
-            var maxRetries = 10;
-            var retryCount = 0;
-            bool elementsExist = false;
-
-            while (!elementsExist && retryCount < maxRetries)
-            {
-                await Task.Delay(200); // Wait 200ms between checks
-
-                try
-                {
-                    var correlationExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('correlationChart') !== null");
-                    var weatherExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('weatherDistributionChart') !== null");
-                    var scatterExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('scatterChart') !== null");
-
-                    Console.WriteLine($"Retry {retryCount + 1}: Canvas elements exist - Correlation: {correlationExists}, Weather: {weatherExists}, Scatter: {scatterExists}");
-
-                    if (correlationExists && weatherExists && scatterExists)
-                    {
-                        elementsExist = true;
-                        break;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error checking canvas elements on retry {retryCount + 1}: {ex.Message}");
-                }
-
-                retryCount++;
-            }
-
-            if (!elementsExist)
-            {
-                Console.WriteLine("Canvas elements not found after maximum retries. Charts will not be initialized.");
-                return;
-            }
-
-            Console.WriteLine("Canvas elements found, initializing charts...");
-
-            try
-            {
-                // Initialize main correlation chart
-                var chartData = new
-                {
-                    labels = correlationData.ChartData.TemperatureData.Labels.ToArray(),
-                    datasets = new object[]
-                    {
-                        new
-                        {
-                            label = "Temperatuur (°C)",
-                            data = correlationData.ChartData.TemperatureData.Temperature.ToArray(),
-                            borderColor = "#ff6b6b",
-                            backgroundColor = "rgba(255, 107, 107, 0.1)",
-                            yAxisID = "y",
-                            type = "line"
-                        },
-                        new
-                        {
-                            label = "Afval Items",
-                            data = correlationData.ChartData.TemperatureData.TrashCount.ToArray(),
-                            borderColor = "#4ecdc4",
-                            backgroundColor = "rgba(78, 205, 196, 0.3)",
-                            yAxisID = "y1",
-                            type = "bar"
-                        }
-                    }
-                };
-
-                await JS.InvokeVoidAsync("initializeCorrelationChart", chartData);
-                Console.WriteLine("Main correlation chart initialized successfully");
-
-                // Initialize weather distribution chart
-                if (correlationData.ChartData.WeatherDistribution?.Labels?.Any() == true)
-                {
-                    var weatherChartData = new
-                    {
-                        labels = correlationData.ChartData.WeatherDistribution.Labels.ToArray(),
-                        values = correlationData.ChartData.WeatherDistribution.Values.ToArray()
-                    };
-
-                    await JS.InvokeVoidAsync("initializeWeatherDistributionChart", weatherChartData);
-                    Console.WriteLine("Weather distribution chart initialized successfully");
-                }
-
-                // Initialize scatter plot
-                if (correlationData.ChartData.CorrelationScatter?.Temperature?.Any() == true)
-                {
-                    var scatterData = new
-                    {
-                        datasets = new object[]
-                        {
-                            new
-                            {
-                                label = "Temperatuur vs Afval",
-                                data = correlationData.ChartData.CorrelationScatter.Temperature
-                                    .Zip(correlationData.ChartData.CorrelationScatter.TrashCount, (temp, trash) => new { x = temp, y = trash })
-                                    .ToArray(),
-                                backgroundColor = "rgba(75, 192, 192, 0.6)",
-                                borderColor = "rgba(75, 192, 192, 1)",
-                                borderWidth = 1
-                            }
-                        }
-                    };
-
-                    await JS.InvokeVoidAsync("initializeScatterChart", scatterData);
-                    Console.WriteLine("Scatter chart initialized successfully");
-                }
-
-                Console.WriteLine("All charts initialization completed successfully");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error initializing correlation charts: {ex.Message}");
+                elementsExist = true;
+                break;
             }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking canvas elements on retry {retryCount + 1}: {ex.Message}");
+        }
+
+        retryCount++;
+    }
+
+    if (!elementsExist)
+    {
+        Console.WriteLine("Canvas elements not found after maximum retries. Charts will not be initialized.");
+        return;
+    }
+
+    Console.WriteLine("Canvas elements found, initializing charts...");
+
+    try
+    {
+        // Initialize main correlation chart
+        var chartData = new
+        {
+            labels = correlationData.ChartData.TemperatureData.Labels.ToArray(),
+            datasets = new object[]
+            {
+                new
+                {
+                    label = "Temperatuur (°C)",
+                    data = correlationData.ChartData.TemperatureData.Temperature.ToArray(),
+                    borderColor = "#ff6b6b",
+                    backgroundColor = "rgba(255, 107, 107, 0.1)",
+                    yAxisID = "y",
+                    type = "line"
+                },
+                new
+                {
+                    label = "Afval Items",
+                    data = correlationData.ChartData.TemperatureData.TrashCount.ToArray(),
+                    borderColor = "#4ecdc4",
+                    backgroundColor = "rgba(78, 205, 196, 0.3)",
+                    yAxisID = "y1",
+                    type = "bar"
+                }
+            }
+        };
+
+        await JS.InvokeVoidAsync("initializeCorrelationChart", chartData);
+        Console.WriteLine("Main correlation chart initialized successfully");
+
+        // Initialize weather distribution chart
+        if (correlationData.ChartData.WeatherDistribution?.Labels?.Any() == true)
+        {
+            var weatherChartData = new
+            {
+                labels = correlationData.ChartData.WeatherDistribution.Labels.ToArray(),
+                values = correlationData.ChartData.WeatherDistribution.Values.ToArray()
+            };
+
+            await JS.InvokeVoidAsync("initializeWeatherDistributionChart", weatherChartData);
+            Console.WriteLine("Weather distribution chart initialized successfully");
+        }
+
+        // Initialize scatter plot
+        if (correlationData.ChartData.CorrelationScatter?.Temperature?.Any() == true)
+        {
+            var scatterData = new
+            {
+                datasets = new object[]
+                {
+                    new
+                    {
+                        label = "Temperatuur vs Afval",
+                        data = correlationData.ChartData.CorrelationScatter.Temperature
+                            .Zip(correlationData.ChartData.CorrelationScatter.TrashCount, (temp, trash) => new { x = temp, y = trash })
+                            .ToArray(),
+                        backgroundColor = "rgba(75, 192, 192, 0.6)",
+                        borderColor = "rgba(75, 192, 192, 1)",
+                        borderWidth = 1
+                    }
+                }
+            };
+
+            await JS.InvokeVoidAsync("initializeScatterChart", scatterData);
+            Console.WriteLine("Scatter chart initialized successfully");
+        }
+
+        Console.WriteLine("All charts initialization completed successfully");
+        
+        await Task.Delay(200); 
+        await JS.InvokeVoidAsync("initializePopovers");
+        Console.WriteLine("Popovers initialized for correlation section");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error initializing correlation charts: {ex.Message}");
+    }
+}
 
         private async Task<string> GetDetailedLocationAsync(float latitude, float longitude)
         {

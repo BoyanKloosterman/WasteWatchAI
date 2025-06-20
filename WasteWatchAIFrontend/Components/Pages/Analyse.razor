@@ -126,8 +126,20 @@
                 <!-- Tab Content -->
                 <div class="tab-content" id="chartTabContent">
                     <div class="tab-pane fade show active" id="typeverdeling" role="tabpanel">
-                        <h6 class="mb-3">Afval Typeverdeling per Locatie</h6>
-                        <p class="text-muted small mb-3">Analyse van verschillende afvaltypes per locatie</p>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h6 class="mb-1">Afval Typeverdeling per Locatie</h6>
+                                <p class="text-muted small mb-0">Analyse van verschillende afvaltypes per locatie</p>
+                            </div>
+                            <i class="bi bi-question-circle-fill text-primary"
+                               style="cursor: pointer;"
+                               data-bs-toggle="popover"
+                               data-bs-trigger="click"
+                               data-bs-placement="top"
+                               title="Uitleg grafiek"
+                               data-bs-content="Deze grafiek toont de verdeling van verschillende afvaltypes per locatie. Elke kleur staat voor een type afval (Plastic, Papier, Glas, Organisch). De grafiek toont alleen de top 5 locaties met de meeste afvaldetecties.">
+                            </i>
+                        </div>
                         <p class="text-muted small mb-2">
                             Data voor: @GetFilterSummary()
                         </p>
@@ -154,18 +166,28 @@
                                     <h6 class="mb-1">Frequentie Analyse</h6>
                                     <p class="text-muted small mb-0">Afvaldetecties per tijdstip van de dag</p>
                                 </div>
-                                <div class="frequency-filter">
-                                    <select class="form-select form-select-sm" style="width: auto;" @bind="selectedFrequencyDay" @bind:after="OnFrequencyFilterChanged">
-                                        <option value="">Alle dagen</option>
-                                        <option value="today">Vandaag</option>
-                                        <option value="yesterday">Gisteren</option>
-                                        <option value="day_2">2 dagen geleden</option>
-                                        <option value="day_3">3 dagen geleden</option>
-                                        <option value="day_4">4 dagen geleden</option>
-                                        <option value="day_5">5 dagen geleden</option>
-                                        <option value="day_6">6 dagen geleden</option>
-                                        <option value="day_7">7 dagen geleden</option>
-                                    </select>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="frequency-filter">
+                                        <select class="form-select form-select-sm" style="width: auto;" @bind="selectedFrequencyDay" @bind:after="OnFrequencyFilterChanged">
+                                            <option value="">Alle dagen</option>
+                                            <option value="today">Vandaag</option>
+                                            <option value="yesterday">Gisteren</option>
+                                            <option value="day_2">2 dagen geleden</option>
+                                            <option value="day_3">3 dagen geleden</option>
+                                            <option value="day_4">4 dagen geleden</option>
+                                            <option value="day_5">5 dagen geleden</option>
+                                            <option value="day_6">6 dagen geleden</option>
+                                            <option value="day_7">7 dagen geleden</option>
+                                        </select>
+                                    </div>
+                                    <i class="bi bi-question-circle-fill text-primary"
+                                       style="cursor: pointer;"
+                                       data-bs-toggle="popover"
+                                       data-bs-trigger="click"
+                                       data-bs-placement="top"
+                                       title="Uitleg grafiek"
+                                       data-bs-content="Deze grafiek toont het aantal afvaldetecties per uur van de dag (06:00-22:00). U kunt een specifieke dag selecteren om de frequentie voor die dag te bekijken. Dit helpt bij het identificeren van piekuren voor afvaldetecties.">
+                                    </i>
                                 </div>
                             </div>
                             <p class="text-muted small mb-2">
@@ -214,6 +236,14 @@
                                     </p>
                                 }
                             </div>
+                            <i class="bi bi-question-circle-fill text-primary"
+                               style="cursor: pointer;"
+                               data-bs-toggle="popover"
+                               data-bs-trigger="click"
+                               data-bs-placement="top"
+                               title="Uitleg correlatie-analyse"
+                               data-bs-content="Deze sectie toont de statistische relatie tussen weersomstandigheden en afvalvolume. De correlatie coëfficiënt (-1 tot 1) geeft de sterkte van het verband aan. Positieve waarden betekenen meer afval bij hoger weer, negatieve waarden betekenen minder afval.">
+                            </i>
                         </div>
 
                         @if (isLoadingCorrelation)
@@ -289,9 +319,19 @@
                             <!-- Main Correlation Chart -->
                             <div class="card mb-4">
                                 <div class="card-header">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-chart-line me-2"></i>Temperatuur vs Afval Correlatie
-                                    </h6>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-chart-line me-2"></i>Temperatuur vs Afval Correlatie
+                                        </h6>
+                                        <i class="bi bi-question-circle-fill text-primary"
+                                           style="cursor: pointer;"
+                                           data-bs-toggle="popover"
+                                           data-bs-trigger="click"
+                                           data-bs-placement="top"
+                                           title="Temperatuur vs Afval grafiek"
+                                           data-bs-content="Deze gecombineerde grafiek toont de relatie tussen dagelijkse temperatuur (rode lijn) en afvalvolume (blauwe balken). De linker Y-as toont temperatuur in °C, de rechter Y-as toont aantal afvalitems.">
+                                        </i>
+                                    </div>
                                 </div>
                                 <div class="card-body">
                                     <div class="chart-container" style="position: relative; height: 400px; width: 100%;">
@@ -306,9 +346,19 @@
                                 <div class="col-md-6">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h6 class="mb-0">
-                                                <i class="fas fa-cloud me-2"></i>Weer Verdeling
-                                            </h6>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0">
+                                                    <i class="fas fa-cloud me-2"></i>Weer Verdeling
+                                                </h6>
+                                                <i class="bi bi-question-circle-fill text-primary"
+                                                   style="cursor: pointer;"
+                                                   data-bs-toggle="popover"
+                                                   data-bs-trigger="click"
+                                                   data-bs-placement="top"
+                                                   title="Weer verdeling grafiek"
+                                                   data-bs-content="Deze donut grafiek toont de verdeling van verschillende weersomstandigheden in de geanalyseerde periode. Elk segment representeert het percentage dagen met dat specifieke weertype.">
+                                                </i>
+                                            </div>
                                         </div>
                                         <div class="card-body">
                                             <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
@@ -322,9 +372,19 @@
                                 <div class="col-md-6">
                                     <div class="card">
                                         <div class="card-header">
-                                            <h6 class="mb-0">
-                                                <i class="fas fa-chart-scatter me-2"></i>Correlatie Scatter Plot
-                                            </h6>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0">
+                                                    <i class="fas fa-chart-scatter me-2"></i>Correlatie Scatter Plot
+                                                </h6>
+                                                <i class="bi bi-question-circle-fill text-primary"
+                                                   style="cursor: pointer;"
+                                                   data-bs-toggle="popover"
+                                                   data-bs-trigger="click"
+                                                   data-bs-placement="top"
+                                                   title="Scatter plot uitleg"
+                                                   data-bs-content="Deze scatter plot toont elk datapunt als een punt met temperatuur op de X-as en afvalvolume op de Y-as. Een trendlijn zou een positieve of negatieve correlatie kunnen tonen. Punten dichter bij een denkbeeldige lijn duiden op een sterkere correlatie.">
+                                                </i>
+                                            </div>
                                         </div>
                                         <div class="card-body">
                                             <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
@@ -435,7 +495,3 @@
         }
     }
 </main>
-
-
-
-
