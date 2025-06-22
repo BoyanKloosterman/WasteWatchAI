@@ -6,7 +6,7 @@ class TrashDataGenerator {
         this.litterTypes = ['Plastic', 'Papier', 'Organisch', 'Glas'];
         this.currentId = 1;
         // Post naar DummyTrashItems endpoint
-        this.realApiUrl = 'http://localhost:8080/api/TrashItems/dummy';
+       this.realApiUrl = process.env.API_URL || 'http://localhost:8080/api/TrashItems/dummy';
         
         // Breda coordinate ranges voor realistische locaties
         this.locations = [
