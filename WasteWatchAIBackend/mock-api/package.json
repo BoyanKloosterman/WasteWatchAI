@@ -1,0 +1,22 @@
+{
+  "name": "mock-api-database-feeder",
+  "version": "1.0.0",
+  "description": "A mock API that feeds realistic data to the real WasteWatchAI database",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "generate": "curl -X POST http://localhost:3001/generate -H \"Content-Type: application/json\" -d \"{\\\"count\\\": 10}\"",
+    "generate-lots": "curl -X POST http://localhost:3001/generate -H \"Content-Type: application/json\" -d \"{\\\"count\\\": 50}\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "author": "",
+  "license": "ISC"
+}
