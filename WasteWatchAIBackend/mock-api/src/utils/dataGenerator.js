@@ -51,10 +51,13 @@ class TrashDataGenerator {
     }
 
     getRandomTimestamp() {
-        // Altijd huidige tijd, met maximaal 1 minuut naar achteren voor variatie
         const now = new Date();
-        const secondsBack = Math.floor(Math.random() * 60); // 0-60 seconden geleden
-        const targetDate = new Date(now.getTime() - (secondsBack * 1000));
+        
+        const timezoneOffset = 2 * 60 * 60 * 1000; // 2 uur in milliseconden
+        const dutchTime = new Date(now.getTime() + timezoneOffset);
+        
+        const secondsBack = Math.floor(Math.random() * 60);
+        const targetDate = new Date(dutchTime.getTime() - (secondsBack * 1000));
         
         return targetDate.toISOString();
     }
