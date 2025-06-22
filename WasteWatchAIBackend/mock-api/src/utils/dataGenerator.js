@@ -69,8 +69,10 @@ class TrashDataGenerator {
         };
     }
 
-    async addNewItems(count = 1) {
+     async addNewItems(count = 1) {
         const results = [];
+        
+        console.log(`🔄 Processing ${count} detection${count > 1 ? 's' : ''}...`);
         
         for (let i = 0; i < count; i++) {
             const dummyTrashItem = this.generateDummyTrashItem();
@@ -79,8 +81,11 @@ class TrashDataGenerator {
                 results.push(result);
             }
             
-            // Variable delay tussen posts (50-200ms)
-            const delay = Math.floor(Math.random() * 150) + 50;
+            // Kortere delay voor grotere batches
+            const delay = count > 5 ? 
+                Math.floor(Math.random() * 50) + 25 :  // 25-75ms voor grote batches
+                Math.floor(Math.random() * 150) + 50;  // 50-200ms voor kleine batches
+            
             await new Promise(resolve => setTimeout(resolve, delay));
         }
         

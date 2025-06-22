@@ -20,7 +20,7 @@ app.get('/health', (req, res) => {
 // Manual generate endpoint
 app.post('/generate', async (req, res) => {
     try {
-        const { count = 5 } = req.body;
+        const { count = 8 } = req.body; // Default naar 8 items in plaats van 5
         console.log(`🚀 Manual generation of ${count} items requested...`);
         const results = await dataGenerator.addNewItems(parseInt(count));
         res.json({
@@ -33,6 +33,7 @@ app.post('/generate', async (req, res) => {
     }
 });
 
+
 // Random interval generator functie
 function scheduleRandomGeneration() {
     // Random interval tussen 20 seconden en 3 minuten
@@ -40,15 +41,15 @@ function scheduleRandomGeneration() {
     const maxInterval = 180000; // 3 minuten
     const randomInterval = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
     
-    // Random aantal items (meestal 1-2, soms meer)
-    const randomCount = Math.random() < 0.8 ? 
-        Math.floor(Math.random() * 2) + 1 :  // 80% kans op 1-2 items
-        Math.floor(Math.random() * 4) + 3;   // 20% kans op 3-6 items
+    // Meer items per detectie - realistischer voor busy locaties
+    const randomCount = Math.random() < 0.6 ? 
+        Math.floor(Math.random() * 4) + 2 :  // 60% kans op 2-5 items
+        Math.floor(Math.random() * 6) + 6;   // 40% kans op 6-11 items (busy periods)
     
     setTimeout(async () => {
         try {
             const intervalMinutes = (randomInterval / 60000).toFixed(1);
-            console.log(`🎯 Random detection! (after ${intervalMinutes} min) - Processing ${randomCount} items...`);
+            console.log(`🎯 Random detection burst! (after ${intervalMinutes} min) - Processing ${randomCount} items...`);
             
             const newItems = await dataGenerator.addNewItems(randomCount);
             console.log(`✅ Posted ${newItems.length} new detections to database`);
@@ -62,7 +63,7 @@ function scheduleRandomGeneration() {
         }
     }, randomInterval);
     
-    console.log(`⏱️  Next detection scheduled in ${(randomInterval / 1000).toFixed(0)} seconds (${randomCount} items)`);
+    console.log(`⏱️  Next detection burst scheduled in ${(randomInterval / 1000).toFixed(0)} seconds (${randomCount} items)`);
 }
 
 // Start direct met random generatie

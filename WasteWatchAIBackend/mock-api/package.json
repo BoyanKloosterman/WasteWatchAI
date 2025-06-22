@@ -1,18 +1,18 @@
 {
-  "name": "mock-api-database-feeder",
+  "name": "wastewatch-data-feeder",
   "version": "1.0.0",
-  "description": "A mock API that feeds realistic data to the real WasteWatchAI database",
+  "description": "Feeds realistic trash detection data to the WasteWatch database",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "generate": "curl -X POST http://localhost:3001/generate -H \"Content-Type: application/json\" -d \"{\\\"count\\\": 10}\"",
-    "generate-lots": "curl -X POST http://localhost:3001/generate -H \"Content-Type: application/json\" -d \"{\\\"count\\\": 50}\""
+    "generate": "node -e \"const gen = require('./src/utils/dataGenerator'); const g = new gen(); g.addNewItems(15).then(() => console.log('✅ Generated 15 items and posted to database')).catch(console.error);\"",
+    "generate-lots": "node -e \"const gen = require('./src/utils/dataGenerator'); const g = new gen(); g.addNewItems(25).then(() => console.log('✅ Generated 25 items and posted to database')).catch(console.error);\"",
+    "generate-burst": "node -e \"const gen = require('./src/utils/dataGenerator'); const g = new gen(); g.addNewItems(50).then(() => console.log('✅ Generated 50 items and posted to database')).catch(console.error);\""
   },
   "dependencies": {
-    "cors": "^2.8.5",
     "express": "^4.17.1",
-    "node-fetch": "^3.3.2"
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
