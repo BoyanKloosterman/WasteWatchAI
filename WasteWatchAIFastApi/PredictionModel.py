@@ -319,7 +319,7 @@ def load_data_and_train_models():
         print("🚀 Starting REAL model training...")
         
         # Convert timestamp to datetime
-        trash['timestamp'] = pd.to_datetime(trash['timestamp'])
+        trash['timestamp'] = pd.to_datetime(trash['timestamp'], format='ISO8601')
         trash['datum'] = trash['timestamp'].dt.date
         trash['hour'] = trash['timestamp'].dt.hour
         trash['min'] = trash['timestamp'].dt.minute
