@@ -59,26 +59,34 @@ namespace WasteWatchAIBackend.Controller
 
             var weatherList = new List<WeatherData>();
 
-            for (int i = 0; i < dates.Count; i++)
-            {
-                DateTime timestamp = DateTime.Parse(dates[i].GetString()).ToUniversalTime();
-                float avgTemp = (maxTemps[i].GetSingle() + minTemps[i].GetSingle()) / 2;
+for (int i = 0; i < dates.Count; i++)
+{
+    DateTime timestamp = DateTime.Parse(dates[i].GetString()).ToUniversalTime();
 
-                bool exists = await _repository.WeatherExistsAsync(timestamp, request.Latitude, request.Longitude);
-                if (exists)
-                    continue;
+    // Check if values are null
+    var maxTempElem = maxTemps[i];
+    var minTempElem = minTemps[i];
+    if (maxTempElem.ValueKind == JsonValueKind.Null || minTempElem.ValueKind == JsonValueKind.Null)
+        continue; // Or handle as you need (e.g., set a default, skip, or log)
 
-                var weather = new WeatherData
-                {
-                    Timestamp = timestamp,
-                    Latitude = request.Latitude,
-                    Longitude = request.Longitude,
-                    Temperature = avgTemp,
-                    WeatherDescription = WeatherCodeToDescription(weatherCodes[i].GetInt32())
-                };
+    float avgTemp = (maxTempElem.GetSingle() + minTempElem.GetSingle()) / 2;
 
-                weatherList.Add(weather);
-            }
+    bool exists = await _repository.WeatherExistsAsync(timestamp, request.Latitude, request.Longitude);
+    if (exists)
+        continue;
+
+    var weather = new WeatherData
+    {
+        Timestamp = timestamp,
+        Latitude = request.Latitude,
+        Longitude = request.Longitude,
+        Temperature = avgTemp,
+        WeatherDescription = WeatherCodeToDescription(weatherCodes[i].GetInt32())
+    };
+
+    weatherList.Add(weather);
+}
+
 
             foreach (var w in weatherList)
             {
