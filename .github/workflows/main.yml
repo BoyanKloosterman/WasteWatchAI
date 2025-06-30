@@ -28,11 +28,14 @@ jobs:
       - name: Run FastAPI tests
         working-directory: ./WasteWatchAIFastApi
         run: |
-          if [ -d "tests" ] && [ "$(ls -A tests)" ]; then
+          if [ -f "test_main.py" ]; then
+            pip install pytest pytest-asyncio httpx
+            python test_main.py
+          elif [ -d "tests" ] && [ "$(ls -A tests)" ]; then
             pip install pytest pytest-asyncio httpx
             python -m pytest tests/ -v
           else
-            echo "No tests directory found or tests directory is empty. Skipping tests."
+            echo "No test files found. Skipping FastAPI tests."
           fi
 
       # ---- .NET Core API ----
@@ -52,8 +55,13 @@ jobs:
       - name: Test .NET API
         working-directory: ./WasteWatchAIBackend
         run: |
-          # Check if there are any test projects
-          if find . -name "*.Tests.csproj" -o -name "*Test*.csproj" -o -name "*Tests*.csproj" | grep -q .; then
+          # Check for test projects in parent directory too
+          if find ../WasteWatchAIBackend.Tests -name "*.csproj" 2>/dev/null | grep -q .; then
+            echo "Found test project in WasteWatchAIBackend.Tests"
+            cd ../WasteWatchAIBackend.Tests
+            dotnet restore
+            dotnet test --configuration Release
+          elif find . -name "*.Tests.csproj" -o -name "*Test*.csproj" -o -name "*Tests*.csproj" | grep -q .; then
             dotnet test --configuration Release --no-build
           else
             echo "No test projects found. Skipping .NET tests."
@@ -67,3 +75,33 @@ jobs:
       - name: Build Blazor
         working-directory: ./WasteWatchAIFrontend
         run: dotnet build --configuration Release --no-restore
+
+              # ---- DOCKER BUILDS ----
+      - name: Build Docker images
+        run: |
+          # Build FastAPI
+          docker build -t wastewatchai-fastapi ./WasteWatchAIFastApi
+          
+          # Build .NET Backend
+          docker build -t wastewatchai-backend ./WasteWatchAIBackend
+          
+          # Build Mock API
+          docker build
+
+      - name: Integration tests
+        run: |
+          # Start mock API for testing
+          cd ./WasteWatchAIBackend/mock-api
+          npm install
+          npm start &
+          MOCK_PID=$!
+          
+          # Wait for service to start
+          sleep 10
+          
+          # Run integration tests
+          cd ../../WasteWatchAIFastApi
+          python test_main.py
+          
+          # Cleanup
+          kill $MOCK_PID || true
