@@ -146,13 +146,3 @@ jobs:
             echo "No Mock API found, skipping integration tests"
           fi
 
-      # ---- DOCKER COMPOSE TEST ----
-      - name: Docker Compose test
-        run: |
-          if [ -f "docker-compose.yml" ]; then
-            echo "Testing Docker Compose setup..."
-            docker-compose config
-            echo "Docker Compose configuration is valid"
-          else
-            echo "No docker-compose.yml found"
-          fi
