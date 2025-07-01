@@ -1,0 +1,105 @@
+@page "/login"
+@using WasteWatchAIFrontend.Models.Auth
+@using WasteWatchAIFrontend.Services.Auth
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@layout WasteWatchAIFrontend.Components.Layout.EmptyLayout
+
+<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
+    <div class="card shadow-lg" style="width: 400px;">
+        <div class="card-body p-5">
+            <div class="text-center mb-4">
+                <h2 class="card-title">WasteWatch AI</h2>
+                <p class="text-muted">Sign in to your account</p>
+            </div>
+
+            <EditForm Model="loginRequest" OnValidSubmit="HandleLogin" FormName="loginForm">
+                <DataAnnotationsValidator />
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">
+                        @errorMessage
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <InputText @bind-Value="loginRequest.Email" class="form-control" id="email" placeholder="Enter your email" />
+                    <ValidationMessage For="@(() => loginRequest.Email)" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <InputText @bind-Value="loginRequest.Password" type="password" class="form-control" id="password" placeholder="Enter your password" />
+                    <ValidationMessage For="@(() => loginRequest.Password)" />
+                </div>
+
+                <div class="d-grid mb-3">
+                    <button type="submit" class="btn btn-primary" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        Sign In
+                    </button>
+                </div>
+
+                <div class="text-center">
+                    <p class="mb-0">Don't have an account? <a href="/register" class="text-primary">Sign up</a></p>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginRequest loginRequest = new();
+    private string errorMessage = string.Empty;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if user is already authenticated
+        var isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        if (isAuthenticated)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var result = await AuthService.LoginAsync(loginRequest);
+
+            if (result.Success)
+            {
+                if (AuthStateProvider is CustomAuthenticationStateProvider customProvider)
+                {
+                    customProvider.NotifyUserAuthentication(result.Email);
+                }
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = result.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Login failed: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

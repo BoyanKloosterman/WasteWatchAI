@@ -1,0 +1,32 @@
+@using WasteWatchAIFrontend.Services.Auth
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+
+<AuthorizeView>
+    <Authorized>
+        <div class="d-flex align-items-center">
+            <span class="me-3">Welcome, @context.User.Identity?.Name</span>
+            <button class="btn btn-outline-danger btn-sm" @onclick="Logout">
+                <i class="bi bi-box-arrow-right"></i> Logout
+            </button>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <a href="/login" class="btn btn-primary btn-sm">Login</a>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        
+        if (AuthStateProvider is CustomAuthenticationStateProvider customProvider)
+        {
+            customProvider.NotifyUserLogout();
+        }
+        
+        Navigation.NavigateTo("/login");
+    }
+}
