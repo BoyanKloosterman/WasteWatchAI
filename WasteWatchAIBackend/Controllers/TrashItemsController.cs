@@ -1,20 +1,25 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using WasteWatchAIBackend.Models;
 using WasteWatchAIBackend.Data;
 using Microsoft.EntityFrameworkCore;
+using WasteWatchAIBackend.Interface;
 
 namespace WasteWatchAIBackend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize] // Beveilig de hele controller
     public class TrashItemsController : ControllerBase
     {
         private readonly WasteWatchDbContext _context;
+        private readonly IAuthenticationService _authService;
 
-        public TrashItemsController(WasteWatchDbContext context)
+        public TrashItemsController(WasteWatchDbContext context, IAuthenticationService authService)
         {
             _context = context;
+            _authService = authService;
         }
 
         [HttpGet("trash")]
@@ -30,13 +35,37 @@ namespace WasteWatchAIBackend.Controllers
             var dummyTrashItems = await _context.DummyTrashItems.ToListAsync();
             return Ok(dummyTrashItems);
         }
+
+        // Admin-only endpoint voorbeeld
+        [HttpGet("admin/all")]
+        [Authorize(Policy = "AdminOnly")]
+        public async Task<ActionResult<object>> GetAllItemsAdmin()
+        {
+            var trashItems = await _context.TrashItems.ToListAsync();
+            var dummyItems = await _context.DummyTrashItems.ToListAsync();
+            
+            return Ok(new 
+            { 
+                TrashItems = trashItems, 
+                DummyItems = dummyItems,
+                TotalCount = trashItems.Count + dummyItems.Count
+            });
+        }
         
-                // POST endpoint voor nieuwe TrashItems
+        // POST endpoint voor nieuwe TrashItems
         [HttpPost]
         public async Task<ActionResult<TrashItem>> CreateTrashItem(TrashItem trashItem)
         {
             try
             {
+                // Optioneel: voeg de gebruiker ID toe aan het trash item
+                var userId = await _authService.GetUserIdAsync();
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    // Als je een UserId property hebt in je TrashItem model:
+                    // trashItem.UserId = userId;
+                }
+
                 _context.TrashItems.Add(trashItem);
                 await _context.SaveChangesAsync();
 
