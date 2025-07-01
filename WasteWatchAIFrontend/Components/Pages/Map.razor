@@ -7,7 +7,8 @@
 
 @rendermode InteractiveServer
 
-<PageTitle>Dashboard</PageTitle>
+
+<AuthGuard>
 
 
 <div class="container py-4">
@@ -460,3 +461,4 @@
         return locations[random.Next(locations.Length)];
     }
 }
+</AuthGuard>
