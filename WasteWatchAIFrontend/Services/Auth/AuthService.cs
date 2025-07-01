@@ -42,13 +42,16 @@ namespace WasteWatchAIFrontend.Services.Auth
                     {
                         // Store token
                         await _localStorage.SetAsync(TokenKey, authResponse.AccessToken);
-                        // Optionally store user info (if available)
+                        
+                        // Store user info
                         var userInfo = new UserInfo
                         {
-                            Email = request.Email, // Use email from request, since not in response
+                            Email = request.Email,
                             IsAuthenticated = true
                         };
                         await _localStorage.SetAsync(UserKey, userInfo);
+                        
+                        Console.WriteLine($"Login successful - Token stored: {authResponse.AccessToken[..20]}...");
                         return authResponse;
                     }
                 }
@@ -172,19 +175,39 @@ namespace WasteWatchAIFrontend.Services.Auth
             {
                 var tokenResult = await _localStorage.GetAsync<string>(TokenKey);
                 if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Value))
+                {
+                    Console.WriteLine("No token found in storage");
                     return false;
+                }
 
                 var token = tokenResult.Value;
+                Console.WriteLine($"Token found: {token[..20]}...");
+
+                // Check if it's a Data Protection token (starts with CfDJ8)
+                if (token.StartsWith("CfDJ8"))
+                {
+                    // For Data Protection tokens, we can't validate expiry client-side
+                    // Just return true if we have a token - the server will validate it
+                    Console.WriteLine("Data Protection token detected - assuming valid");
+                    return true;
+                }
+
+                // Handle JWT tokens
                 var jwtHandler = new JwtSecurityTokenHandler();
-                
                 if (!jwtHandler.CanReadToken(token))
+                {
+                    Console.WriteLine("Token is not a valid JWT");
                     return false;
+                }
 
                 var jwtToken = jwtHandler.ReadJwtToken(token);
-                return jwtToken.ValidTo > DateTime.UtcNow;
+                var isValid = jwtToken.ValidTo > DateTime.UtcNow;
+                Console.WriteLine($"JWT token validation: {isValid}");
+                return isValid;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"Error validating token: {ex.Message}");
                 return false;
             }
         }

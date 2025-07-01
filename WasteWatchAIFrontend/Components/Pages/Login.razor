@@ -79,23 +79,30 @@
 
         try
         {
+            Console.WriteLine("Starting login process...");
             var result = await AuthService.LoginAsync(loginRequest);
+            Console.WriteLine($"Login result: AccessToken = {(!string.IsNullOrEmpty(result?.AccessToken) ? "Present" : "Missing")}");
 
             if (result != null && !string.IsNullOrEmpty(result.AccessToken))
             {
+                Console.WriteLine("Login successful, notifying authentication state...");
                 if (AuthStateProvider is CustomAuthenticationStateProvider customProvider)
                 {
                     customProvider.NotifyUserAuthentication(loginRequest.Email);
                 }
-                Navigation.NavigateTo("/");
+                
+                Console.WriteLine("Navigating to home page...");
+                Navigation.NavigateTo("/", forceLoad: true);
             }
             else
             {
+                Console.WriteLine($"Login failed: {result?.Message}");
                 errorMessage = result?.Message ?? "Login failed. Please try again.";
             }
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"Login exception: {ex.Message}");
             errorMessage = $"Login failed: {ex.Message}";
         }
         finally

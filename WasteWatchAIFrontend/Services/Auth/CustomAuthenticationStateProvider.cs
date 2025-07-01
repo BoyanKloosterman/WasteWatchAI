@@ -17,17 +17,15 @@ namespace WasteWatchAIFrontend.Services.Auth
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
             var isAuthenticated = await _authService.IsAuthenticatedAsync();
+            Console.WriteLine($"GetAuthenticationStateAsync - IsAuthenticated: {isAuthenticated}");
             
             if (isAuthenticated)
             {
                 var userInfo = await _authService.GetCurrentUserAsync();
                 var token = _authService.GetToken();
                 
-                if (!string.IsNullOrEmpty(token))
+                if (!string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(userInfo.Email))
                 {
-                    var jwtHandler = new JwtSecurityTokenHandler();
-                    var jwtToken = jwtHandler.ReadJwtToken(token);
-                    
                     var claims = new List<Claim>
                     {
                         new Claim(ClaimTypes.Name, userInfo.Email),
@@ -35,44 +33,71 @@ namespace WasteWatchAIFrontend.Services.Auth
                         new Claim("IsAuthenticated", "true")
                     };
                     
-                    // Add additional claims from JWT
-                    claims.AddRange(jwtToken.Claims);
+                    // Only try to parse JWT if it's not a Data Protection token
+                    if (!token.StartsWith("CfDJ8"))
+                    {
+                        try
+                        {
+                            var jwtHandler = new JwtSecurityTokenHandler();
+                            if (jwtHandler.CanReadToken(token))
+                            {
+                                var jwtToken = jwtHandler.ReadJwtToken(token);
+                                claims.AddRange(jwtToken.Claims);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error parsing JWT: {ex.Message}");
+                        }
+                    }
                     
-                    var identity = new ClaimsIdentity(claims, "jwt");
+                    var identity = new ClaimsIdentity(claims, "bearer");
                     var user = new ClaimsPrincipal(identity);
                     
+                    Console.WriteLine($"User authenticated with email: {userInfo.Email}");
                     return new AuthenticationState(user);
                 }
             }
             
+            Console.WriteLine("User not authenticated");
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
         }
 
         public void NotifyUserAuthentication(string email)
         {
+            Console.WriteLine($"NotifyUserAuthentication called for: {email}");
+            
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, email),
+                new Claim(ClaimTypes.Email, email),
+                new Claim("IsAuthenticated", "true")
+            };
+            
             // Get token from storage
             var token = _authService.GetToken();
-            if (!string.IsNullOrEmpty(token))
+            if (!string.IsNullOrEmpty(token) && !token.StartsWith("CfDJ8"))
             {
-                var jwtHandler = new JwtSecurityTokenHandler();
-                var jwtToken = jwtHandler.ReadJwtToken(token);
-                var claims = new List<Claim>
+                try
                 {
-                    new Claim(ClaimTypes.Name, email),
-                    new Claim(ClaimTypes.Email, email),
-                    new Claim("IsAuthenticated", "true")
-                };
-                // Add claims from JWT
-                claims.AddRange(jwtToken.Claims);
-                var identity = new ClaimsIdentity(claims, "jwt");
-                var user = new ClaimsPrincipal(identity);
-                NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
+                    var jwtHandler = new JwtSecurityTokenHandler();
+                    if (jwtHandler.CanReadToken(token))
+                    {
+                        var jwtToken = jwtHandler.ReadJwtToken(token);
+                        claims.AddRange(jwtToken.Claims);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error parsing JWT in NotifyUserAuthentication: {ex.Message}");
+                }
             }
-            else
-            {
-                // Fallback: unauthenticated
-                NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
-            }
+            
+            var identity = new ClaimsIdentity(claims, "bearer");
+            var user = new ClaimsPrincipal(identity);
+            
+            Console.WriteLine($"Notifying authentication state changed for: {email}");
+            NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
         }
 
         public void NotifyUserLogout()
