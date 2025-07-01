@@ -78,21 +78,56 @@ namespace WasteWatchAIFrontend.Services.Auth
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var authResponse = JsonSerializer.Deserialize<AuthResponse>(content, new JsonSerializerOptions
+                    // ASP.NET Core Identity registration returns 200 OK with empty body on success
+                    // We need to login after successful registration to get the token
+                    if (string.IsNullOrWhiteSpace(content))
                     {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-                    if (authResponse != null && !string.IsNullOrEmpty(authResponse.AccessToken))
-                    {
-                        var userInfo = new UserInfo
+                        // Registration successful, now login to get token
+                        var loginRequest = new LoginRequest
                         {
-                            Email = request.Email, // Use email from request
-                            IsAuthenticated = true
+                            Email = request.Email,
+                            Password = request.Password
                         };
-                        await _localStorage.SetAsync(UserKey, userInfo);
-                        await _localStorage.SetAsync(TokenKey, authResponse.AccessToken);
-                        return authResponse;
+                        
+                        var loginResult = await LoginAsync(loginRequest);
+                        if (loginResult != null && !string.IsNullOrEmpty(loginResult.AccessToken))
+                        {
+                            return new AuthResponse
+                            {
+                                AccessToken = loginResult.AccessToken,
+                                TokenType = loginResult.TokenType,
+                                ExpiresIn = loginResult.ExpiresIn,
+                                RefreshToken = loginResult.RefreshToken,
+                                Message = "Registration successful"
+                            };
+                        }
+                        else
+                        {
+                            return new AuthResponse
+                            {
+                                Message = "Registration successful, but login failed. Please try logging in manually."
+                            };
+                        }
+                    }
+                    else
+                    {
+                        // Try to parse response if there is content
+                        var authResponse = JsonSerializer.Deserialize<AuthResponse>(content, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+
+                        if (authResponse != null && !string.IsNullOrEmpty(authResponse.AccessToken))
+                        {
+                            var userInfo = new UserInfo
+                            {
+                                Email = request.Email,
+                                IsAuthenticated = true
+                            };
+                            await _localStorage.SetAsync(UserKey, userInfo);
+                            await _localStorage.SetAsync(TokenKey, authResponse.AccessToken);
+                            return authResponse;
+                        }
                     }
                 }
 
