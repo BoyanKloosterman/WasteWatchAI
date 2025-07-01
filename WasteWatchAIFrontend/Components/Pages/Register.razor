@@ -118,8 +118,8 @@
             }
             else
             {
-                errorMessage = result.Message;
-                errors = result.Errors;
+                errorMessage = $"DEBUG: Success={result.Success}, Message='{result.Message}', ErrorCount={result.Errors?.Count ?? 0}";
+                errors = result.Errors ?? new List<string>();
             }
         }
         catch (Exception ex)

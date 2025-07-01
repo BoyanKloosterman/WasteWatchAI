@@ -1,3 +1,4 @@
+// Add CORS
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
@@ -51,6 +52,18 @@ builder.Services.AddScoped<IIdentityRepository, IdentityRepository>();
 
 builder.Services.AddHttpClient();
 
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("https://localhost:7092") // Add your frontend URLs
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 builder.Services
     .AddOptions<BearerTokenOptions>()
     .Bind(builder.Configuration.GetSection("BearerToken"))
@@ -71,6 +84,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Use CORS
+app.UseCors("AllowFrontend");
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapGroup("account")

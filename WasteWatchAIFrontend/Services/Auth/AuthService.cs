@@ -24,7 +24,7 @@ namespace WasteWatchAIFrontend.Services.Auth
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("api/auth/login", request);
+                var response = await _httpClient.PostAsJsonAsync("api/Auth/login", request);
                 var content = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
@@ -63,14 +63,16 @@ namespace WasteWatchAIFrontend.Services.Auth
                     Message = $"Login failed: {ex.Message}" 
                 };
             }
-        }
-
-        public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
+        }        public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("api/auth/register", request);
+                var response = await _httpClient.PostAsJsonAsync("api/Auth/register", request);
                 var content = await response.Content.ReadAsStringAsync();
+
+                // Log the response for debugging
+                Console.WriteLine($"Response Status: {response.StatusCode}");
+                Console.WriteLine($"Response Content: {content}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -114,7 +116,7 @@ namespace WasteWatchAIFrontend.Services.Auth
                     return new AuthResponse 
                     { 
                         Success = false, 
-                        Message = "Registration failed",
+                        Message = $"Registration failed. Status: {response.StatusCode}. Content: {content}",
                         Errors = errors
                     };
                 }
@@ -123,7 +125,7 @@ namespace WasteWatchAIFrontend.Services.Auth
                     return new AuthResponse 
                     { 
                         Success = false, 
-                        Message = "Registration failed" 
+                        Message = $"Registration failed. Status: {response.StatusCode}. Content: {content}" 
                     };
                 }
             }
