@@ -12,8 +12,8 @@ using WasteWatchAIBackend.Data;
 namespace WasteWatchAIBackend.Migrations
 {
     [DbContext(typeof(WasteWatchDbContext))]
-    [Migration("20250606122247_initialcreate")]
-    partial class initialcreate
+    [Migration("20250701110026_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,39 +25,28 @@ namespace WasteWatchAIBackend.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("WasteWatchAIBackend.Models.PredictionResult", b =>
+            modelBuilder.Entity("WasteWatchAIBackend.Models.DummyTrashItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("FeatureLocationType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<float>("FeatureTemp")
-                        .HasColumnType("real");
-
-                    b.Property<string>("FeatureWeather")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<float>("Latitude")
                         .HasColumnType("real");
 
-                    b.Property<float>("Longitude")
-                        .HasColumnType("real");
-
-                    b.Property<string>("Prediction")
+                    b.Property<string>("LitterType")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<float>("Longitude")
+                        .HasColumnType("real");
 
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.ToTable("PredictionResults");
+                    b.ToTable("DummyTrashItems");
                 });
 
             modelBuilder.Entity("WasteWatchAIBackend.Models.TrashItem", b =>
