@@ -1,4 +1,6 @@
 @page "/register"
+@rendermode InteractiveServer
+
 @using WasteWatchAIFrontend.Models.Auth
 @using WasteWatchAIFrontend.Services.Auth
 @inject IAuthService AuthService
@@ -14,7 +16,7 @@
                 <p class="text-muted">Create your account</p>
             </div>
 
-            <EditForm Model="registerRequest" OnSubmit="HandleRegister" FormName="registerForm">
+            <EditForm Model="registerRequest" OnSubmit="HandleRegister">
                 <DataAnnotationsValidator />
                 <ValidationSummary />
 
@@ -90,12 +92,13 @@
         }
     }
 
-    private async Task HandleRegister()
+    private async Task HandleRegister(EditContext context)
     {
         isLoading = true;
         errorMessage = string.Empty;
         errors.Clear();
         StateHasChanged();
+        Console.WriteLine($"Email: {registerRequest.Email}, Password: {registerRequest.Password}, Confirm: {registerRequest.ConfirmPassword}");
 
         try
         {
