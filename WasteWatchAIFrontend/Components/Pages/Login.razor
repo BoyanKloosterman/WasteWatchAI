@@ -1,6 +1,7 @@
 @page "/login"
 @using WasteWatchAIFrontend.Models.Auth
 @using WasteWatchAIFrontend.Services.Auth
+@using Microsoft.AspNetCore.Components.Forms
 @inject IAuthService AuthService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthStateProvider
@@ -15,7 +16,7 @@
                 <p class="text-muted">Sign in to your account</p>
             </div>
 
-            <EditForm Model="loginRequest" OnValidSubmit="HandleLogin">
+            <EditForm Model="loginRequest" OnValidSubmit="HandleLogin" FormName="loginForm">
                 <DataAnnotationsValidator />
 
                 @if (!string.IsNullOrEmpty(errorMessage))
@@ -80,17 +81,17 @@
         {
             var result = await AuthService.LoginAsync(loginRequest);
 
-            if (result.Success)
+            if (result != null && !string.IsNullOrEmpty(result.AccessToken))
             {
                 if (AuthStateProvider is CustomAuthenticationStateProvider customProvider)
                 {
-                    customProvider.NotifyUserAuthentication(result.Email);
+                    customProvider.NotifyUserAuthentication(loginRequest.Email);
                 }
                 Navigation.NavigateTo("/");
             }
             else
             {
-                errorMessage = result.Message;
+                errorMessage = result?.Message ?? "Login failed. Please try again.";
             }
         }
         catch (Exception ex)

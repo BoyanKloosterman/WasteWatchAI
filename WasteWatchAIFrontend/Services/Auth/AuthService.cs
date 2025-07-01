@@ -24,8 +24,12 @@ namespace WasteWatchAIFrontend.Services.Auth
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("api/Auth/login", request);
+                var response = await _httpClient.PostAsJsonAsync("account/login", request);
                 var content = await response.Content.ReadAsStringAsync();
+
+                // Log the response for debugging
+                Console.WriteLine($"Login Response Status: {response.StatusCode}");
+                Console.WriteLine($"Login Response Content: {content}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -34,40 +38,38 @@ namespace WasteWatchAIFrontend.Services.Auth
                         PropertyNameCaseInsensitive = true
                     });
 
-                    if (authResponse != null && authResponse.Success)
+                    if (authResponse != null && !string.IsNullOrEmpty(authResponse.AccessToken))
                     {
-                        await _localStorage.SetAsync(TokenKey, authResponse.Token);
-                        
+                        // Store token
+                        await _localStorage.SetAsync(TokenKey, authResponse.AccessToken);
+                        // Optionally store user info (if available)
                         var userInfo = new UserInfo
                         {
-                            Email = authResponse.Email,
+                            Email = request.Email, // Use email from request, since not in response
                             IsAuthenticated = true
                         };
-                        
                         await _localStorage.SetAsync(UserKey, userInfo);
                         return authResponse;
                     }
                 }
 
-                return new AuthResponse 
-                { 
-                    Success = false, 
-                    Message = "Invalid login credentials" 
+                return new AuthResponse
+                {
+                    Message = $"Invalid login credentials. Status: {response.StatusCode}. Content: {content}"
                 };
             }
             catch (Exception ex)
             {
-                return new AuthResponse 
-                { 
-                    Success = false, 
-                    Message = $"Login failed: {ex.Message}" 
+                return new AuthResponse
+                {
+                    Message = $"Login failed: {ex.Message}"
                 };
             }
         }        public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("api/Auth/register", request);
+                var response = await _httpClient.PostAsJsonAsync("account/register", request);
                 var content = await response.Content.ReadAsStringAsync();
 
                 // Log the response for debugging
@@ -81,60 +83,31 @@ namespace WasteWatchAIFrontend.Services.Auth
                         PropertyNameCaseInsensitive = true
                     });
 
-                    if (authResponse != null && authResponse.Success)
+                    if (authResponse != null && !string.IsNullOrEmpty(authResponse.AccessToken))
                     {
-                        await _localStorage.SetAsync(TokenKey, authResponse.Token);
-                        
                         var userInfo = new UserInfo
                         {
-                            Email = authResponse.Email,
+                            Email = request.Email, // Use email from request
                             IsAuthenticated = true
                         };
-                        
                         await _localStorage.SetAsync(UserKey, userInfo);
+                        await _localStorage.SetAsync(TokenKey, authResponse.AccessToken);
                         return authResponse;
                     }
                 }
 
-                // Try to parse validation errors
-                try
+                // Try to parse error message
+                string errorMsg = $"Registration failed. Status: {response.StatusCode}. Content: {content}";
+                return new AuthResponse
                 {
-                    var errorResponse = JsonSerializer.Deserialize<Dictionary<string, string[]>>(content, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-                    var errors = new List<string>();
-                    if (errorResponse != null)
-                    {
-                        foreach (var error in errorResponse.Values)
-                        {
-                            errors.AddRange(error);
-                        }
-                    }
-
-                    return new AuthResponse 
-                    { 
-                        Success = false, 
-                        Message = $"Registration failed. Status: {response.StatusCode}. Content: {content}",
-                        Errors = errors
-                    };
-                }
-                catch
-                {
-                    return new AuthResponse 
-                    { 
-                        Success = false, 
-                        Message = $"Registration failed. Status: {response.StatusCode}. Content: {content}" 
-                    };
-                }
+                    Message = errorMsg
+                };
             }
             catch (Exception ex)
             {
-                return new AuthResponse 
-                { 
-                    Success = false, 
-                    Message = $"Registration failed: {ex.Message}" 
+                return new AuthResponse
+                {
+                    Message = $"Registration failed: {ex.Message}"
                 };
             }
         }

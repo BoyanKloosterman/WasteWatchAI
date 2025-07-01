@@ -50,17 +50,29 @@ namespace WasteWatchAIFrontend.Services.Auth
 
         public void NotifyUserAuthentication(string email)
         {
-            var claims = new[]
+            // Get token from storage
+            var token = _authService.GetToken();
+            if (!string.IsNullOrEmpty(token))
             {
-                new Claim(ClaimTypes.Name, email),
-                new Claim(ClaimTypes.Email, email),
-                new Claim("IsAuthenticated", "true")
-            };
-            
-            var identity = new ClaimsIdentity(claims, "jwt");
-            var user = new ClaimsPrincipal(identity);
-            
-            NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
+                var jwtHandler = new JwtSecurityTokenHandler();
+                var jwtToken = jwtHandler.ReadJwtToken(token);
+                var claims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.Name, email),
+                    new Claim(ClaimTypes.Email, email),
+                    new Claim("IsAuthenticated", "true")
+                };
+                // Add claims from JWT
+                claims.AddRange(jwtToken.Claims);
+                var identity = new ClaimsIdentity(claims, "jwt");
+                var user = new ClaimsPrincipal(identity);
+                NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
+            }
+            else
+            {
+                // Fallback: unauthenticated
+                NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
+            }
         }
 
         public void NotifyUserLogout()

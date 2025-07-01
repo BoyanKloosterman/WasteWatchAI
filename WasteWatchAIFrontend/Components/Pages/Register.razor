@@ -111,18 +111,17 @@
 
             var result = await AuthService.RegisterAsync(registerRequest);
 
-            if (result.Success)
+            if (result != null && !string.IsNullOrEmpty(result.AccessToken))
             {
                 if (AuthStateProvider is CustomAuthenticationStateProvider customProvider)
                 {
-                    customProvider.NotifyUserAuthentication(result.Email);
+                    customProvider.NotifyUserAuthentication(registerRequest.Email);
                 }
                 Navigation.NavigateTo("/");
             }
             else
             {
-                errorMessage = $"DEBUG: Success={result.Success}, Message='{result.Message}', ErrorCount={result.Errors?.Count ?? 0}";
-                errors = result.Errors ?? new List<string>();
+                errorMessage = result?.Message ?? "Registration failed. Please try again.";
             }
         }
         catch (Exception ex)
