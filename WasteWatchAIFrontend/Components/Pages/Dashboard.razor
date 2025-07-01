@@ -9,6 +9,7 @@
 
 <PageTitle>Dashboard</PageTitle>
 
+<Layout.AuthGuard>
 @if (showAlert)
 {
     <div class="alert alert-danger alert-dismissible fade show position-fixed top-0 end-0 m-3" style="z-index: 1000;" role="alert">
@@ -863,3 +864,4 @@
         } catch {}
     };
 </script>
+</Layout.AuthGuard>

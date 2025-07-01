@@ -1,0 +1,303 @@
+@page "/home"
+@using WasteWatchAIFrontend.Services
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Welkom - WasteWatch AI</PageTitle>
+
+<div class="home-container">
+    <div class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">
+                Welkom bij <span class="brand-highlight">WasteWatch AI</span>
+            </h1>
+            <p class="hero-subtitle">
+                Slim afvalbeheer met de kracht van kunstmatige intelligentie
+            </p>
+            <div class="hero-buttons">
+                @if (isAuthenticated)
+                {
+                    <a href="/dashboard" class="btn btn-primary btn-lg">
+                        <i class="fas fa-tachometer-alt"></i>
+                        Ga naar Dashboard
+                    </a>
+                    <a href="/prediction" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-chart-line"></i>
+                        Voorspellingen
+                    </a>
+                }
+                else
+                {
+                    <a href="/login" class="btn btn-primary btn-lg">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Inloggen
+                    </a>
+                    <a href="/register" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-user-plus"></i>
+                        Account aanmaken
+                    </a>
+                }
+            </div>
+        </div>
+        <div class="hero-image">
+            <div class="feature-card">
+                <i class="fas fa-robot feature-icon"></i>
+                <h3>AI-gedreven</h3>
+                <p>Geavanceerde algoritmes voor nauwkeurige voorspellingen</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="features-section">
+        <div class="container">
+            <h2 class="section-title">Waarom WasteWatch AI?</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-icon-wrapper">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Slimme Analyses</h3>
+                    <p>Krijg inzicht in afvalpatronen en optimaliseer je processen met AI-analyses.</p>
+                </div>
+                
+                <div class="feature-item">
+                    <div class="feature-icon-wrapper">
+                        <i class="fas fa-map-marked-alt"></i>
+                    </div>
+                    <h3>Locatie Tracking</h3>
+                    <p>Visualiseer afvallocaties en optimaliseer routes voor efficiënte inzameling.</p>
+                </div>
+                
+                <div class="feature-item">
+                    <div class="feature-icon-wrapper">
+                        <i class="fas fa-leaf"></i>
+                    </div>
+                    <h3>Duurzaamheid</h3>
+                    <p>Draag bij aan een groenere toekomst door slim afvalbeheer.</p>
+                </div>
+                
+                <div class="feature-item">
+                    <div class="feature-icon-wrapper">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3>Real-time Updates</h3>
+                    <p>Ontvang live updates en meldingen over je afvalbeheer systeem.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .home-container {
+        min-height: 100vh;
+    }
+
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        padding: 60px 20px;
+        color: white;
+    }
+
+    .hero-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 60px;
+        align-items: center;
+    }
+
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        line-height: 1.2;
+    }
+
+    .brand-highlight {
+        background: linear-gradient(45deg, #ffd700, #ffed4e);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .hero-subtitle {
+        font-size: 1.25rem;
+        margin-bottom: 2rem;
+        opacity: 0.9;
+        line-height: 1.6;
+    }
+
+    .hero-buttons {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .hero-image {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .feature-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 40px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        max-width: 300px;
+    }
+
+    .feature-card .feature-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        color: #ffd700;
+    }
+
+    .feature-card h3 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .features-section {
+        padding: 80px 20px;
+        background: #f8f9fa;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .section-title {
+        text-align: center;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 3rem;
+        color: #333;
+    }
+
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 2rem;
+    }
+
+    .feature-item {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .feature-item:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .feature-icon-wrapper {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+    }
+
+    .feature-icon-wrapper i {
+        font-size: 2rem;
+        color: white;
+    }
+
+    .feature-item h3 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: #333;
+    }
+
+    .feature-item p {
+        color: #666;
+        line-height: 1.6;
+    }
+
+    .btn {
+        padding: 12px 30px;
+        border-radius: 50px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+
+    .btn-primary {
+        background: #ffd700;
+        color: #333;
+        border-color: #ffd700;
+    }
+
+    .btn-primary:hover {
+        background: #ffed4e;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(255, 215, 0, 0.3);
+    }
+
+    .btn-outline-primary {
+        background: transparent;
+        color: white;
+        border-color: white;
+    }
+
+    .btn-outline-primary:hover {
+        background: white;
+        color: #667eea;
+    }
+
+    .btn-lg {
+        padding: 15px 35px;
+        font-size: 1.1rem;
+    }
+
+    @@media (max-width: 768px) {
+        .hero-content {
+            grid-template-columns: 1fr;
+            text-align: center;
+            gap: 40px;
+        }
+
+        .hero-title {
+            font-size: 2.5rem;
+        }
+
+        .hero-buttons {
+            justify-content: center;
+        }
+
+        .features-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+@code {
+    private bool isAuthenticated = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+    }
+}

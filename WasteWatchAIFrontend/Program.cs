@@ -1,12 +1,16 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using WasteWatchAIFrontend.Components;
+using WasteWatchAIFrontend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Add authentication services
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 
 // Add HttpClient services
 builder.Services.AddHttpClient();
