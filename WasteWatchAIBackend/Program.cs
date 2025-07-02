@@ -62,7 +62,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Map Identity API endpoints onder /account
-app.MapIdentityApi<IdentityUser>();
+app.MapGroup("/account").MapIdentityApi<IdentityUser>();
 
 // Optioneel: logout endpoint
 app.MapPost("/account/logout", async (SignInManager<IdentityUser> signInManager) =>
