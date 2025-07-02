@@ -168,3 +168,123 @@ jobs:
             echo "No Mock API found, skipping integration tests"
           fi
 
+  local-deployment:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ---- DEPLOY FASTAPI ----
+      - name: Set up Python for deployment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install FastAPI deployment dependencies
+        working-directory: ./WasteWatchAIFastApi
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install uvicorn
+
+      - name: Start FastAPI service
+        working-directory: ./WasteWatchAIFastApi
+        run: |
+          echo "Starting FastAPI service..."
+          nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
+          FASTAPI_PID=$!
+          echo "FastAPI_PID=$FASTAPI_PID" >> $GITHUB_ENV
+          echo "FastAPI service started with PID: $FASTAPI_PID"
+          
+          # Wait for service to start
+          sleep 10
+          
+          # Health check
+          if curl -f http://localhost:8000/docs >/dev/null 2>&1; then
+            echo "FastAPI service is running and accessible"
+          else
+            echo "Warning: FastAPI service might not be responding"
+          fi
+
+      # ---- DEPLOY .NET BACKEND ----
+      - name: Setup .NET for deployment
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore and build .NET Backend for deployment
+        working-directory: ./WasteWatchAIBackend
+        run: |
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+
+      - name: Start .NET Backend service
+        working-directory: ./WasteWatchAIBackend
+        run: |
+          echo "Starting .NET Backend service..."
+          nohup dotnet run --configuration Release --urls "http://0.0.0.0:8080" &
+          BACKEND_PID=$!
+          echo "BACKEND_PID=$BACKEND_PID" >> $GITHUB_ENV
+          echo ".NET Backend service started with PID: $BACKEND_PID"
+          
+          # Wait for service to start
+          sleep 15
+          
+          # Health check
+          if curl -f http://localhost:8080/api/weather >/dev/null 2>&1; then
+            echo ".NET Backend service is running and accessible"
+          else
+            echo "Warning: .NET Backend service might not be responding"
+          fi
+
+      # ---- DEPLOYMENT VERIFICATION ----
+      - name: Verify deployment
+        run: |
+          echo "Verifying local deployment..."
+          
+          # Test FastAPI endpoints
+          echo "Testing FastAPI endpoints..."
+          if curl -f http://localhost:8000/health >/dev/null 2>&1; then
+            echo "✓ FastAPI health endpoint responding"
+          else
+            echo "✗ FastAPI health endpoint not responding"
+          fi
+          
+          # Test .NET Backend endpoints
+          echo "Testing .NET Backend endpoints..."
+          if curl -f http://localhost:8080/api/weather >/dev/null 2>&1; then
+            echo "✓ .NET Backend weather endpoint responding"
+          else
+            echo "✗ .NET Backend weather endpoint not responding"
+          fi
+          
+          # Show running processes
+          echo "Current running processes:"
+          ps aux | grep -E "(uvicorn|dotnet)" | grep -v grep || echo "No services found in process list"
+
+      # ---- DEPLOYMENT CLEANUP ----
+      - name: Cleanup deployment
+        if: always()
+        run: |
+          echo "Cleaning up deployment processes..."
+          
+          # Stop FastAPI
+          if [ ! -z "$FASTAPI_PID" ]; then
+            echo "Stopping FastAPI service (PID: $FASTAPI_PID)..."
+            kill $FASTAPI_PID 2>/dev/null || true
+          fi
+          
+          # Stop .NET Backend
+          if [ ! -z "$BACKEND_PID" ]; then
+            echo "Stopping .NET Backend service (PID: $BACKEND_PID)..."
+            kill $BACKEND_PID 2>/dev/null || true
+          fi
+          
+          # Additional cleanup
+          pkill -f "uvicorn" 2>/dev/null || true
+          pkill -f "dotnet run" 2>/dev/null || true
+          
+          echo "Deployment cleanup completed"
+
