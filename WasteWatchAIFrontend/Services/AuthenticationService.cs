@@ -7,6 +7,7 @@ namespace WasteWatchAIFrontend.Services
 {
     public interface IAuthenticationService
     {
+        event Action? AuthenticationStateChanged;
         Task<bool> LoginAsync(LoginRequest loginRequest);
         Task<bool> RegisterAsync(RegisterRequest registerRequest);
         Task LogoutAsync();
@@ -22,6 +23,8 @@ namespace WasteWatchAIFrontend.Services
         private readonly ILogger<AuthenticationService> _logger;
         private const string TOKEN_KEY = "access_token";
         private const string USER_INFO_KEY = "user_info";
+
+        public event Action? AuthenticationStateChanged;
 
         public AuthenticationService(
             IHttpClientFactory httpClientFactory, 
@@ -71,6 +74,9 @@ namespace WasteWatchAIFrontend.Services
                             // Default authorization header instellen
                             _httpClient.DefaultRequestHeaders.Authorization = 
                                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+                            // Notify components that authentication state has changed
+                            AuthenticationStateChanged?.Invoke();
 
                             return true;
                         }
@@ -144,6 +150,9 @@ namespace WasteWatchAIFrontend.Services
                 
                 // Authorization header verwijderen
                 _httpClient.DefaultRequestHeaders.Authorization = null;
+                
+                // Notify components that authentication state has changed
+                AuthenticationStateChanged?.Invoke();
             }
         }
 

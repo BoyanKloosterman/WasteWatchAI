@@ -2,6 +2,7 @@
 @using WasteWatchAIFrontend.Services
 @inject IAuthenticationService AuthService
 @inject NavigationManager Navigation
+@implements IDisposable
 @rendermode InteractiveServer
 
 <PageTitle>Welkom - WasteWatch AI</PageTitle>
@@ -299,5 +300,22 @@
     protected override async Task OnInitializedAsync()
     {
         isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        
+        // Subscribe to authentication state changes
+        AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
+    }
+
+    private async void OnAuthenticationStateChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            isAuthenticated = await AuthService.IsAuthenticatedAsync();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
     }
 }

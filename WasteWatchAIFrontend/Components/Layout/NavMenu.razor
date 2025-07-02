@@ -128,7 +128,10 @@
     {
         await CheckAuthenticationStatus();
         
-        // Periodiek controleren van authenticatie status
+        // Subscribe to authentication state changes
+        AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
+        
+        // Periodiek controleren van authenticatie status (backup)
         timer = new Timer(async _ => 
         {
             await InvokeAsync(async () =>
@@ -154,6 +157,15 @@
         }
     }
 
+    private async void OnAuthenticationStateChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            await CheckAuthenticationStatus();
+            StateHasChanged();
+        });
+    }
+
     private async Task HandleLogout()
     {
         await AuthService.LogoutAsync();
@@ -164,6 +176,7 @@
 
     public void Dispose()
     {
+        AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
         timer?.Dispose();
     }
 }

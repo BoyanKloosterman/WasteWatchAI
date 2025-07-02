@@ -1,6 +1,7 @@
 @using WasteWatchAIFrontend.Services
 @inject IAuthenticationService AuthService
 @inject NavigationManager Navigation
+@implements IDisposable
 
 @if (isLoading)
 {
@@ -124,6 +125,9 @@ else
         try
         {
             isAuthenticated = await AuthService.IsAuthenticatedAsync();
+            
+            // Subscribe to authentication state changes
+            AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
         }
         catch (Exception)
         {
@@ -133,5 +137,27 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private async void OnAuthenticationStateChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            try
+            {
+                isAuthenticated = await AuthService.IsAuthenticatedAsync();
+                StateHasChanged();
+            }
+            catch (Exception)
+            {
+                isAuthenticated = false;
+                StateHasChanged();
+            }
+        });
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
     }
 }
