@@ -368,7 +368,7 @@
             await UpdateMap();
             StateHasChanged();
         });
-            }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+            }, null, TimeSpan.Zero, TimeSpan.FromMinutes(5)); // Changed from 1 minute to 5 minutes
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)

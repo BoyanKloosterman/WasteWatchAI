@@ -11,10 +11,12 @@ namespace WasteWatchAIBackend.Controllers
     public class AccountManagementController : ControllerBase
     {
         private readonly UserManager<IdentityUser> _userManager;
+        private readonly ILogger<AccountManagementController> _logger;
 
-        public AccountManagementController(UserManager<IdentityUser> userManager)
+        public AccountManagementController(UserManager<IdentityUser> userManager, ILogger<AccountManagementController> logger)
         {
             _userManager = userManager;
+            _logger = logger;
         }
 
         /// <summary>
@@ -115,28 +117,42 @@ namespace WasteWatchAIBackend.Controllers
         [HttpGet("me")]
         public async Task<IActionResult> GetCurrentUser()
         {
+            _logger.LogDebug("GetCurrentUser endpoint called");
+            
+            // Log authorization header
+            var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+            _logger.LogDebug("Authorization header present: {HasAuthHeader}", !string.IsNullOrEmpty(authHeader));
+            
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            _logger.LogDebug("User ID from claims: {UserId}", userId);
+            
             if (string.IsNullOrEmpty(userId))
             {
+                _logger.LogWarning("User ID is null or empty - user not authenticated");
                 return Unauthorized();
             }
 
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
+                _logger.LogWarning("User not found in database for ID: {UserId}", userId);
                 return NotFound("Gebruiker niet gevonden");
             }
 
             var claims = await _userManager.GetClaimsAsync(user);
+            _logger.LogDebug("Retrieved {ClaimCount} claims for user {UserId}", claims.Count, userId);
             
-            return Ok(new
+            var result = new
             {
                 Id = user.Id,
                 Email = user.Email,
                 UserName = user.UserName,
                 EmailConfirmed = user.EmailConfirmed,
                 Claims = claims.Select(c => new { Type = c.Type, Value = c.Value }).ToList()
-            });
+            };
+            
+            _logger.LogInformation("Successfully retrieved current user info for {UserId}", userId);
+            return Ok(result);
         }
     }
 

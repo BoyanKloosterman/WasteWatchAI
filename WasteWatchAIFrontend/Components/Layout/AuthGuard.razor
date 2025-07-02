@@ -1,6 +1,7 @@
 @using WasteWatchAIFrontend.Services
 @inject IAuthenticationService AuthService
 @inject NavigationManager Navigation
+@inject ILogger<AuthGuard> Logger
 @implements IDisposable
 
 @if (isLoading)
@@ -122,34 +123,65 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Logger.LogDebug("AuthGuard initializing");
+        
         try
         {
             isAuthenticated = await AuthService.IsAuthenticatedAsync();
+            Logger.LogInformation("AuthGuard authentication check completed. Authenticated: {IsAuthenticated}", isAuthenticated);
+            
+            // Log current page URL
+            Logger.LogDebug("Current page URL: {Url}", Navigation.Uri);
+            
+            // Get and log token info
+            var token = await AuthService.GetTokenAsync();
+            Logger.LogDebug("Token present: {HasToken}, Length: {TokenLength}", 
+                !string.IsNullOrEmpty(token), 
+                !string.IsNullOrEmpty(token) ? token.Length : 0);
+            
+            // Get and log user info
+            var userInfo = await AuthService.GetUserInfoAsync();
+            Logger.LogDebug("User info: {UserInfo}", 
+                userInfo != null ? $"Email: {userInfo.Email}, Authenticated: {userInfo.IsAuthenticated}" : "None");
             
             // Subscribe to authentication state changes
             AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
+            Logger.LogDebug("Subscribed to authentication state changes");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogError(ex, "Error during AuthGuard initialization");
             isAuthenticated = false;
         }
         finally
         {
             isLoading = false;
+            Logger.LogDebug("AuthGuard loading completed");
         }
     }
 
     private async void OnAuthenticationStateChanged()
     {
+        Logger.LogDebug("Authentication state changed event received");
+        
         await InvokeAsync(async () =>
         {
             try
             {
                 isAuthenticated = await AuthService.IsAuthenticatedAsync();
+                Logger.LogInformation("Authentication state updated. New state: {IsAuthenticated}", isAuthenticated);
+                
+                // Log token status on state change
+                var token = await AuthService.GetTokenAsync();
+                Logger.LogDebug("Token after state change - Present: {HasToken}, Length: {TokenLength}", 
+                    !string.IsNullOrEmpty(token), 
+                    !string.IsNullOrEmpty(token) ? token.Length : 0);
+                
                 StateHasChanged();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Logger.LogError(ex, "Error during authentication state change");
                 isAuthenticated = false;
                 StateHasChanged();
             }
@@ -158,6 +190,7 @@ else
 
     public void Dispose()
     {
+        Logger.LogDebug("AuthGuard disposing");
         AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
     }
 }
