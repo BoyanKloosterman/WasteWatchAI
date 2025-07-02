@@ -1,31 +1,9 @@
-@using WasteWatchAIFrontend.Services
-@inject IAuthenticationService AuthService
-@inject NavigationManager Navigation
 @implements IDisposable
 @rendermode InteractiveServer
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">WasteWatchAI</a>
-        
-        <div class="auth-section">
-            @if (isAuthenticated)
-            {
-                <span class="user-info">@userEmail</span>
-                <button class="btn btn-outline-light btn-sm" @onclick="HandleLogout">
-                    <i class="fas fa-sign-out-alt"></i> Uitloggen
-                </button>
-            }
-            else
-            {
-                <a href="/login" class="btn btn-outline-light btn-sm me-2">
-                    <i class="fas fa-sign-in-alt"></i> Inloggen
-                </a>
-                <a href="/register" class="btn btn-light btn-sm">
-                    <i class="fas fa-user-plus"></i> Registreren
-                </a>
-            }
-        </div>
     </div>
 </div>
 
@@ -85,98 +63,26 @@
 </div>
 
 <style>
-    .auth-section {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .user-info {
-        color: white;
-        font-size: 14px;
-        margin-right: 10px;
-    }
-
-    .btn-sm {
-        padding: 4px 12px;
-        font-size: 14px;
-    }
-
-    .btn-outline-light:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-    }
-
-    @@media (max-width: 768px) {
-        .auth-section {
-            flex-direction: column;
-            gap: 5px;
-        }
-        
-        .user-info {
-            margin-right: 0;
-            font-size: 12px;
-        }
-    }
+    /* No additional styles needed for authentication since it's moved to MainLayout */
 </style>
 
 @code {
-    private bool isAuthenticated = false;
-    private string userEmail = string.Empty;
     private Timer? timer;
 
     protected override async Task OnInitializedAsync()
     {
-        await CheckAuthenticationStatus();
-        
-        // Subscribe to authentication state changes
-        AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
-        
-        // Periodiek controleren van authenticatie status (backup)
+        // Periodiek controleren voor andere doeleinden (backup)
         timer = new Timer(async _ => 
         {
-            await InvokeAsync(async () =>
+            await InvokeAsync(() =>
             {
-                await CheckAuthenticationStatus();
                 StateHasChanged();
             });
         }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
     }
 
-    private async Task CheckAuthenticationStatus()
-    {
-        isAuthenticated = await AuthService.IsAuthenticatedAsync();
-        
-        if (isAuthenticated)
-        {
-            var userInfo = await AuthService.GetUserInfoAsync();
-            userEmail = userInfo?.Email ?? string.Empty;
-        }
-        else
-        {
-            userEmail = string.Empty;
-        }
-    }
-
-    private async void OnAuthenticationStateChanged()
-    {
-        await InvokeAsync(async () =>
-        {
-            await CheckAuthenticationStatus();
-            StateHasChanged();
-        });
-    }
-
-    private async Task HandleLogout()
-    {
-        await AuthService.LogoutAsync();
-        isAuthenticated = false;
-        userEmail = string.Empty;
-        Navigation.NavigateTo("/login");
-    }
-
     public void Dispose()
     {
-        AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
         timer?.Dispose();
     }
 }
