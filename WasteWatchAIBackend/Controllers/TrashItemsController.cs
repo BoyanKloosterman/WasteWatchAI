@@ -35,22 +35,6 @@ namespace WasteWatchAIBackend.Controllers
             var dummyTrashItems = await _context.DummyTrashItems.ToListAsync();
             return Ok(dummyTrashItems);
         }
-
-        // Admin-only endpoint voorbeeld
-        [HttpGet("admin/all")]
-        [Authorize(Policy = "AdminOnly")]
-        public async Task<ActionResult<object>> GetAllItemsAdmin()
-        {
-            var trashItems = await _context.TrashItems.ToListAsync();
-            var dummyItems = await _context.DummyTrashItems.ToListAsync();
-            
-            return Ok(new 
-            { 
-                TrashItems = trashItems, 
-                DummyItems = dummyItems,
-                TotalCount = trashItems.Count + dummyItems.Count
-            });
-        }
         
         // POST endpoint voor nieuwe TrashItems
         [HttpPost]
