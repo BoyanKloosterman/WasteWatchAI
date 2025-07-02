@@ -10,7 +10,7 @@ namespace WasteWatchAIBackend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize] // Beveilig de hele controller
+    // [Authorize] // Beveilig de hele controller
     public class TrashItemsController : ControllerBase
     {
         private readonly WasteWatchDbContext _context;
