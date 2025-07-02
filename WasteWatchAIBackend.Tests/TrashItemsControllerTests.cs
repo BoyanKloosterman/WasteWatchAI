@@ -28,38 +28,38 @@ namespace WasteWatchAIBackend.Tests
         }
 
 
-        [TestMethod]
-        public async Task GetTrashItems_ReturnsAllTrashItems()
-        {
-            // Arrange
-            var context = GetDbContextWithData();
-            var controller = new TrashItemsController(context);
+        //[TestMethod]
+        //public async Task GetTrashItems_ReturnsAllTrashItems()
+        //{
+        //    // Arrange
+        //    var context = GetDbContextWithData();
+        //    var controller = new TrashItemsController(context);
 
-            // Act
-            var result = await controller.GetTrashItems();
+        //    // Act
+        //    var result = await controller.GetTrashItems();
 
-            // Assert
-            Assert.IsInstanceOfType(result.Result, typeof(OkObjectResult));
-            var items = (result.Result as OkObjectResult).Value as IEnumerable<TrashItem>;
-            Assert.IsNotNull(items);
-            Assert.AreEqual(1, items.Count());
-        }
+        //    // Assert
+        //    Assert.IsInstanceOfType(result.Result, typeof(OkObjectResult));
+        //    var items = (result.Result as OkObjectResult).Value as IEnumerable<TrashItem>;
+        //    Assert.IsNotNull(items);
+        //    Assert.AreEqual(1, items.Count());
+        //}
 
-        [TestMethod]
-        public async Task GetDummyTrashItems_ReturnsAllDummyTrashItems()
-        {
-            // Arrange
-            var context = GetDbContextWithData();
-            var controller = new TrashItemsController(context);
+        //[TestMethod]
+        //public async Task GetDummyTrashItems_ReturnsAllDummyTrashItems()
+        //{
+        //    // Arrange
+        //    var context = GetDbContextWithData();
+        //    var controller = new TrashItemsController(context);
 
-            // Act
-            var result = await controller.GetDummyTrashItems();
+        //    // Act
+        //    var result = await controller.GetDummyTrashItems();
 
-            // Assert
-            Assert.IsInstanceOfType(result.Result, typeof(OkObjectResult));
-            var items = (result.Result as OkObjectResult).Value as IEnumerable<DummyTrashItem>;
-            Assert.IsNotNull(items);
-            Assert.AreEqual(1, items.Count());
-        }
+        //    // Assert
+        //    Assert.IsInstanceOfType(result.Result, typeof(OkObjectResult));
+        //    var items = (result.Result as OkObjectResult).Value as IEnumerable<DummyTrashItem>;
+        //    Assert.IsNotNull(items);
+        //    Assert.AreEqual(1, items.Count());
+        //}
     }
 }

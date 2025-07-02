@@ -16,6 +16,8 @@ namespace WasteWatchAIBackend.Controllers
         private readonly WasteWatchDbContext _context;
         private readonly IAuthenticationService _authService;
 
+
+
         public TrashItemsController(WasteWatchDbContext context, IAuthenticationService authService)
         {
             _context = context;
