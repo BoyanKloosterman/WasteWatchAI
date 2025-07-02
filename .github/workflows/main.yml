@@ -93,6 +93,28 @@ jobs:
         working-directory: ./WasteWatchAIFrontend
         run: dotnet build --configuration Release --no-restore
 
+      # ---- DATABASE MIGRATIONS ----
+      - name: Install Entity Framework tools
+        run: dotnet tool install --global dotnet-ef
+        
+      - name: Generate migration script
+        working-directory: ./WasteWatchAIBackend
+        run: |
+          echo "Generating SQL migration script..."
+          dotnet ef migrations script --output migrations.sql --idempotent
+          
+      - name: Validate migrations
+        working-directory: ./WasteWatchAIBackend
+        run: |
+          echo "Validating migration script..."
+          if [ -f "migrations.sql" ]; then
+            echo "Migration script generated successfully"
+            echo "Script size: $(wc -c < migrations.sql) bytes"
+          else
+            echo "Error: Migration script not generated"
+            exit 1
+          fi
+
       # ---- DOCKER BUILDS ----
       - name: Build Docker images
         run: |
