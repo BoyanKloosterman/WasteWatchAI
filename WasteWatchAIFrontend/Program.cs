@@ -5,19 +5,12 @@ using WasteWatchAIFrontend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure logging
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
-builder.Logging.AddDebug();
-builder.Logging.SetMinimumLevel(LogLevel.Information); // Changed from Debug to Information
-
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // Add authentication services
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
-builder.Services.AddScoped<ITokenInitializationService, TokenInitializationService>();
 
 // Add HttpClient services
 builder.Services.AddHttpClient();
