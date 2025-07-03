@@ -34,8 +34,8 @@ namespace WasteWatchAIFrontend.Components.Pages
         private bool chartsNeedUpdate = false;
         private bool isDataModeChanging = false;
         private List<string> availableLocations = new();
-        private int currentDisplayCount = 0; 
-        private string selectedFrequencyDay = string.Empty; 
+        private int currentDisplayCount = 0;
+        private string selectedFrequencyDay = string.Empty;
         private readonly Dictionary<string, string> wasteTypeColors = new()
         {
             { "Plastic", "#e74c3c" },      // Red
@@ -133,7 +133,7 @@ namespace WasteWatchAIFrontend.Components.Pages
             finally
             {
                 isLoading = false;
-                UpdateAvailableLocations(); 
+                UpdateAvailableLocations();
                 await ProcessData();
                 StateHasChanged();
                 chartsNeedUpdate = true;
@@ -143,7 +143,7 @@ namespace WasteWatchAIFrontend.Components.Pages
         private async Task ToggleDataMode()
         {
             isLoading = true;
-            isDataModeChanging = true; 
+            isDataModeChanging = true;
             StateHasChanged();
 
             // Reset filters when switching data mode
@@ -163,27 +163,27 @@ namespace WasteWatchAIFrontend.Components.Pages
             isDataModeChanging = false; // Reset flag after mode change is complete
         }
 
-protected override async Task OnAfterRenderAsync(bool firstRender)
-{
-    if (!isLoading && (firstRender || chartsNeedUpdate))
-    {
-        await JS.InvokeVoidAsync("eval", @"
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (!isLoading && (firstRender || chartsNeedUpdate))
+            {
+                await JS.InvokeVoidAsync("eval", @"
             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle=""tooltip""]'));
             tooltipTriggerList.map(function (tooltipTriggerEl) {
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
         ");
-        await JS.InvokeVoidAsync("initializePopovers");
-        await InitializeCharts();
-        chartsNeedUpdate = false;
-    }
-    
-    if (correlationData != null && !isLoadingCorrelation)
-    {
-        await Task.Delay(100); 
-        await JS.InvokeVoidAsync("initializePopovers");
-    }
-}
+                await JS.InvokeVoidAsync("initializePopovers");
+                await InitializeCharts();
+                chartsNeedUpdate = false;
+            }
+
+            if (correlationData != null && !isLoadingCorrelation)
+            {
+                await Task.Delay(100);
+                await JS.InvokeVoidAsync("initializePopovers");
+            }
+        }
 
         private async Task InitializeCharts()
         {
@@ -267,12 +267,12 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
             // Process frequency data - filter by selected day if specified
             await ProcessFrequencyData();
         }
-        
+
         // Add new method for processing frequency data
         private async Task ProcessFrequencyData()
         {
             var itemsToAnalyze = HasActiveFilters() ? filteredTrashItems : trashItems;
-            
+
             // Filter by selected day if specified
             if (!string.IsNullOrEmpty(selectedFrequencyDay))
             {
@@ -308,14 +308,14 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
 
             frequencyData = hourlyFrequency;
         }
-        
+
         private async Task OnFrequencyFilterChanged()
         {
             await ProcessFrequencyData();
             StateHasChanged();
             await InitializeFrequencyChart();
         }
-        
+
         private void UpdateAvailableLocations()
         {
             // Always use the original unfiltered trashItems for available locations
@@ -617,7 +617,7 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
             selectedCategory = string.Empty;
             selectedFrequencyDay = string.Empty; // Add this line
         }
-        
+
         private bool HasActiveFilters()
         {
             return !string.IsNullOrEmpty(selectedPeriod) ||
@@ -759,62 +759,61 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
         }
 
         private async Task InitializeCorrelationChart()
-{
-    if (correlationData?.ChartData == null)
-    {
-        Console.WriteLine("No correlation data available");
-        return;
-    }
-
-    Console.WriteLine("Starting chart initialization...");
-
-    // Wait for DOM elements to exist with retry mechanism
-    var maxRetries = 10;
-    var retryCount = 0;
-    bool elementsExist = false;
-
-    while (!elementsExist && retryCount < maxRetries)
-    {
-        await Task.Delay(200); // Wait 200ms between checks
-
-        try
         {
-            var correlationExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('correlationChart') !== null");
-            var weatherExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('weatherDistributionChart') !== null");
-            var scatterExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('scatterChart') !== null");
-
-            Console.WriteLine($"Retry {retryCount + 1}: Canvas elements exist - Correlation: {correlationExists}, Weather: {weatherExists}, Scatter: {scatterExists}");
-
-            if (correlationExists && weatherExists && scatterExists)
+            if (correlationData?.ChartData == null)
             {
-                elementsExist = true;
-                break;
+                Console.WriteLine("No correlation data available");
+                return;
             }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error checking canvas elements on retry {retryCount + 1}: {ex.Message}");
-        }
 
-        retryCount++;
-    }
+            Console.WriteLine("Starting chart initialization...");
 
-    if (!elementsExist)
-    {
-        Console.WriteLine("Canvas elements not found after maximum retries. Charts will not be initialized.");
-        return;
-    }
+            // Wait for DOM elements to exist with retry mechanism
+            var maxRetries = 10;
+            var retryCount = 0;
+            bool elementsExist = false;
 
-    Console.WriteLine("Canvas elements found, initializing charts...");
-
-    try
-    {
-        // Initialize main correlation chart
-        var chartData = new
-        {
-            labels = correlationData.ChartData.TemperatureData.Labels.ToArray(),
-            datasets = new object[]
+            while (!elementsExist && retryCount < maxRetries)
             {
+                await Task.Delay(200); // Wait 200ms between checks
+
+                try
+                {
+                    var correlationExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('correlationChart') !== null");
+                    var weatherExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('weatherDistributionChart') !== null");
+                    var scatterExists = await JS.InvokeAsync<bool>("eval", "document.getElementById('scatterChart') !== null");
+
+                    Console.WriteLine($"Retry {retryCount + 1}: Canvas elements exist - Correlation: {correlationExists}, Weather: {weatherExists}, Scatter: {scatterExists}");
+
+                    if (correlationExists && weatherExists && scatterExists)
+                    {
+                        elementsExist = true;
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return;
+                }
+
+                retryCount++;
+            }
+
+            if (!elementsExist)
+            {
+                return;
+            }
+
+            Console.WriteLine("Canvas elements found, initializing charts...");
+
+            try
+            {
+                // Initialize main correlation chart
+                var chartData = new
+                {
+                    labels = correlationData.ChartData.TemperatureData.Labels.ToArray(),
+                    datasets = new object[]
+                    {
                 new
                 {
                     label = "Temperatuur (°C)",
@@ -833,32 +832,32 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
                     yAxisID = "y1",
                     type = "bar"
                 }
-            }
-        };
+                    }
+                };
 
-        await JS.InvokeVoidAsync("initializeCorrelationChart", chartData);
-        Console.WriteLine("Main correlation chart initialized successfully");
+                await JS.InvokeVoidAsync("initializeCorrelationChart", chartData);
+                Console.WriteLine("Main correlation chart initialized successfully");
 
-        // Initialize weather distribution chart
-        if (correlationData.ChartData.WeatherDistribution?.Labels?.Any() == true)
-        {
-            var weatherChartData = new
-            {
-                labels = correlationData.ChartData.WeatherDistribution.Labels.ToArray(),
-                values = correlationData.ChartData.WeatherDistribution.Values.ToArray()
-            };
-
-            await JS.InvokeVoidAsync("initializeWeatherDistributionChart", weatherChartData);
-            Console.WriteLine("Weather distribution chart initialized successfully");
-        }
-
-        // Initialize scatter plot
-        if (correlationData.ChartData.CorrelationScatter?.Temperature?.Any() == true)
-        {
-            var scatterData = new
-            {
-                datasets = new object[]
+                // Initialize weather distribution chart
+                if (correlationData.ChartData.WeatherDistribution?.Labels?.Any() == true)
                 {
+                    var weatherChartData = new
+                    {
+                        labels = correlationData.ChartData.WeatherDistribution.Labels.ToArray(),
+                        values = correlationData.ChartData.WeatherDistribution.Values.ToArray()
+                    };
+
+                    await JS.InvokeVoidAsync("initializeWeatherDistributionChart", weatherChartData);
+                    Console.WriteLine("Weather distribution chart initialized successfully");
+                }
+
+                // Initialize scatter plot
+                if (correlationData.ChartData.CorrelationScatter?.Temperature?.Any() == true)
+                {
+                    var scatterData = new
+                    {
+                        datasets = new object[]
+                        {
                     new
                     {
                         label = "Temperatuur vs Afval",
@@ -869,24 +868,24 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
                         borderColor = "rgba(75, 192, 192, 1)",
                         borderWidth = 1
                     }
+                        }
+                    };
+
+                    await JS.InvokeVoidAsync("initializeScatterChart", scatterData);
+                    Console.WriteLine("Scatter chart initialized successfully");
                 }
-            };
 
-            await JS.InvokeVoidAsync("initializeScatterChart", scatterData);
-            Console.WriteLine("Scatter chart initialized successfully");
+                Console.WriteLine("All charts initialization completed successfully");
+
+                await Task.Delay(200);
+                await JS.InvokeVoidAsync("initializePopovers");
+                Console.WriteLine("Popovers initialized for correlation section");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing correlation charts: {ex.Message}");
+            }
         }
-
-        Console.WriteLine("All charts initialization completed successfully");
-        
-        await Task.Delay(200); 
-        await JS.InvokeVoidAsync("initializePopovers");
-        Console.WriteLine("Popovers initialized for correlation section");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error initializing correlation charts: {ex.Message}");
-    }
-}
 
         private async Task<string> GetDetailedLocationAsync(float latitude, float longitude)
         {
@@ -1002,7 +1001,7 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
                     var existingCamera = cameraLocationCache.FirstOrDefault(kvp => kvp.Key == locationKey);
                     if (!existingCamera.Equals(default(KeyValuePair<string, string>)))
                     {
-                        var cameraNumber = existingCamera.Value.Split(' ')[1]; 
+                        var cameraNumber = existingCamera.Value.Split(' ')[1];
                         cameraLocationCache[locationKey] = $"Camera {cameraNumber} - {detailedLocation}";
                     }
 
@@ -1022,11 +1021,11 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (string.IsNullOrEmpty(selectedFrequencyDay))
                 return "alle dagen";
-                
+
             return selectedFrequencyDay switch
             {
                 "today" => "vandaag",
-                "yesterday" => "gisteren", 
+                "yesterday" => "gisteren",
                 "day_2" => "2 dagen geleden",
                 "day_3" => "3 dagen geleden",
                 "day_4" => "4 dagen geleden",
