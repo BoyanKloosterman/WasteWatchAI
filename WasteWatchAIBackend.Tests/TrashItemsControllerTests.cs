@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
+using Moq;
+using WasteWatchAIBackend.Interface; // <-- Correct interface namespace
 
 namespace WasteWatchAIBackend.Tests
 {
@@ -27,13 +29,13 @@ namespace WasteWatchAIBackend.Tests
             return context;
         }
 
-
         [TestMethod]
         public async Task GetTrashItems_ReturnsAllTrashItems()
         {
             // Arrange
             var context = GetDbContextWithData();
-            var controller = new TrashItemsController(context);
+            var mockAuthService = new Mock<IAuthenticationService>();
+            var controller = new TrashItemsController(context, mockAuthService.Object);
 
             // Act
             var result = await controller.GetTrashItems();
@@ -50,7 +52,8 @@ namespace WasteWatchAIBackend.Tests
         {
             // Arrange
             var context = GetDbContextWithData();
-            var controller = new TrashItemsController(context);
+            var mockAuthService = new Mock<IAuthenticationService>();
+            var controller = new TrashItemsController(context, mockAuthService.Object);
 
             // Act
             var result = await controller.GetDummyTrashItems();
