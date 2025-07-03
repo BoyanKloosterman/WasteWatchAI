@@ -4,7 +4,7 @@ using WasteWatchAIBackend.Data;
 using WasteWatchAIBackend.Interface;
 using WasteWatchAIBackend.Repository;
 using WasteWatchAIBackend.Services;
-using Microsoft.AspNetCore.Identity;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +59,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Add request logging middleware (before authentication)
+app.UseRequestLogging();
+
 // Identity Framework middleware (volgorde is belangrijk!)
 app.UseAuthentication();
 app.UseAuthorization();
@@ -73,7 +76,7 @@ app.MapPost("/account/logout", async (SignInManager<IdentityUser> signInManager)
     return Results.Ok(new { Message = "Successfully logged out" });
 }).RequireAuthorization();
 
-app.MapControllers();
+app.MapControllers().RequireAuthorization();
 
 using (var scope = app.Services.CreateScope())
 {
