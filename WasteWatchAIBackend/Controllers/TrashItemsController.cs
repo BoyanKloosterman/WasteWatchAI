@@ -9,6 +9,7 @@ using WasteWatchAIBackend.Interface;
 namespace WasteWatchAIBackend.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     // [Authorize] // Beveilig de hele controller
     public class TrashItemsController : ControllerBase

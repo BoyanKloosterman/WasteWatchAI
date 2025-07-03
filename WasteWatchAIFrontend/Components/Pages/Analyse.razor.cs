@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations;
 using WasteWatchAIFrontend.Models;
 using System.Text.Json.Serialization;
 using System.Text.Json;
+using WasteWatchAIFrontend.Services;
 
 namespace WasteWatchAIFrontend.Components.Pages
 {
@@ -12,6 +13,7 @@ namespace WasteWatchAIFrontend.Components.Pages
     {
         [Inject] private IHttpClientFactory HttpClientFactory { get; set; } = default!;
         [Inject] private IJSRuntime JS { get; set; } = default!;
+        [Inject] private IAuthenticationService AuthenticationService { get; set; } = default!;
 
         // State variables
         private List<TrashItem> filteredTrashItems = new();
@@ -28,7 +30,7 @@ namespace WasteWatchAIFrontend.Components.Pages
         private CorrelationData? correlationData;
         private bool isLoadingCorrelation = false;
         private string correlationError = string.Empty;
-        private bool useDummyData = false;
+        private bool useDummyData = true;
         private bool chartsNeedUpdate = false;
         private bool isDataModeChanging = false;
         private List<string> availableLocations = new();
@@ -57,7 +59,7 @@ namespace WasteWatchAIFrontend.Components.Pages
 
             currentDisplayCount = trashItems.Count; // Initialize display count
             await ProcessData();
-            await LoadCorrelationData();
+            LoadCorrelationData();
         }
 
         private async Task LoadDummyTrashData()
@@ -65,7 +67,20 @@ namespace WasteWatchAIFrontend.Components.Pages
             try
             {
                 var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
+                var token = await AuthenticationService.GetTokenAsync();
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                }
+                else
+                {
+                    httpClient.DefaultRequestHeaders.Authorization = null;
+                }
+
                 var response = await httpClient.GetAsync("api/trashitems/dummy");
+
                 if (response.IsSuccessStatusCode)
                 {
                     trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
@@ -91,7 +106,19 @@ namespace WasteWatchAIFrontend.Components.Pages
             try
             {
                 var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
-                var response = await httpClient.GetAsync("api/trashitems/trash");
+                var token = await AuthenticationService.GetTokenAsync();
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                }
+                else
+                {
+                    httpClient.DefaultRequestHeaders.Authorization = null;
+                }
+
+                var response = await httpClient.GetAsync("api/trashitems/dummy");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -620,7 +647,7 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
             try
             {
                 Console.WriteLine("Starting correlation data load...");
-                var httpClient = HttpClientFactory.CreateClient();
+                var httpClient = HttpClientFactory.CreateClient("FastAPI");
 
                 // Use filtered items if filters are active, otherwise use all items
                 var itemsToAnalyze = HasActiveFilters() ? filteredTrashItems : trashItems;
@@ -655,7 +682,7 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
                 };
 
                 Console.WriteLine($"Making API request with {daysBack} days back...");
-                var response = await httpClient.PostAsJsonAsync("http://localhost:8000/api/correlation/analyze", requestData);
+                var response = await httpClient.PostAsJsonAsync("api/correlation/analyze", requestData);
 
                 Console.WriteLine($"API Response status: {response.StatusCode}");
 
