@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const AuthService = require('./authService');
 
 class TrashDataGenerator {
     constructor() {
@@ -7,6 +8,9 @@ class TrashDataGenerator {
         this.currentId = 1;
         // Post naar DummyTrashItems endpoint
        this.realApiUrl = process.env.API_URL || 'http://localhost:8080/api/TrashItems/dummy';
+        
+        // Initialize auth service
+        this.authService = new AuthService();
         
         // Breda coordinate ranges voor realistische locaties
         this.locations = [
@@ -97,13 +101,8 @@ class TrashDataGenerator {
 
     async postToRealAPI(dummyTrashItem) {
         try {
-            const fetch = (await import('node-fetch')).default;
-            
-            const response = await fetch(this.realApiUrl, {
+            const response = await this.authService.makeAuthenticatedRequest(this.realApiUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(dummyTrashItem)
             });
 
