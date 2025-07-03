@@ -80,7 +80,8 @@ using (var scope = app.Services.CreateScope())
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
 
     string serviceUserEmail = "serviceaccount@example.com";
-    string serviceUserPassword = builder.Configuration["ServiceAccount:Password"] ?? "VeiligWachtwoord123!"; // haal uit config
+
+    string serviceUserPassword = builder.Configuration.GetSection("ServiceAccount")["Password"];
 
     var user = await userManager.FindByEmailAsync(serviceUserEmail);
     if (user == null)
