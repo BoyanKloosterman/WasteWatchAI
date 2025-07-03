@@ -4,6 +4,7 @@ using WasteWatchAIBackend.Data;
 using WasteWatchAIBackend.Interface;
 using WasteWatchAIBackend.Repository;
 using WasteWatchAIBackend.Services;
+using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("UserOrAdmin", policy => 
         policy.RequireClaim("role", "user", "admin"));
 });
+
 builder.Services.AddIdentityApiEndpoints<IdentityUser>(options =>
 {
     // Configureer wachtwoord complexiteit
@@ -73,4 +75,30 @@ app.MapPost("/account/logout", async (SignInManager<IdentityUser> signInManager)
 
 app.MapControllers();
 
+using (var scope = app.Services.CreateScope())
+{
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+
+    string serviceUserEmail = "serviceaccount@example.com";
+    string serviceUserPassword = builder.Configuration["ServiceAccount:Password"] ?? "VeiligWachtwoord123!"; // haal uit config
+
+    var user = await userManager.FindByEmailAsync(serviceUserEmail);
+    if (user == null)
+    {
+        user = new IdentityUser
+        {
+            UserName = serviceUserEmail,
+            Email = serviceUserEmail,
+            EmailConfirmed = true
+        };
+        var result = await userManager.CreateAsync(user, serviceUserPassword);
+        if (!result.Succeeded)
+        {
+            // Log eventueel fouten hier
+            throw new Exception("Kon service account niet aanmaken: " + string.Join(", ", result.Errors.Select(e => e.Description)));
+        }
+    }
+}
+
 app.Run();
+

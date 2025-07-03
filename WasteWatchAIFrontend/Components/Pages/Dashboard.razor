@@ -2,8 +2,10 @@
 @using WasteWatchAIFrontend.Models
 @using System.Text.Json
 @using System.Text.Json.Serialization
+@using WasteWatchAIFrontend.Services
 @inject IJSRuntime JSRuntime
 @inject IHttpClientFactory HttpClientFactory
+@inject IAuthenticationService AuthenticationService
 @rendermode InteractiveServer
 
 <PageTitle>Dashboard</PageTitle>
@@ -589,13 +591,29 @@
             try
             {
                 var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
+                var token = await AuthenticationService.GetTokenAsync();
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                }
+                else
+                {
+                    httpClient.DefaultRequestHeaders.Authorization = null;
+                }
+
                 var response = await httpClient.GetAsync("api/trashitems/dummy");
+
                 if (response.IsSuccessStatusCode)
                 {
                     trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Afhandeling van fouten, evt logging
+            }
         }
 
         private async Task OnFilterChanged()
