@@ -2,6 +2,7 @@
 using Microsoft.JSInterop;
 using System.Net.Http;
 using WasteWatchAIFrontend.Models;
+using WasteWatchAIFrontend.Services;
 
 namespace WasteWatchAIFrontend.Components.Pages
 {
@@ -34,8 +35,6 @@ namespace WasteWatchAIFrontend.Components.Pages
             if (confidence >= 0.5f) return "bg-warning";
             return "bg-danger";
         }
-
-        
 
         private async Task ToggleDataMode()
         {

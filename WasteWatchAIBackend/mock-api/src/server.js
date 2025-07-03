@@ -8,6 +8,18 @@ const PORT = process.env.PORT || 3001;
 // Initialize data generator
 const dataGenerator = new TrashDataGenerator();
 
+// Initialize authentication on startup
+async function initializeAuth() {
+    try {
+        console.log('🔐 Initializing authentication...');
+        await dataGenerator.authService.login();
+        console.log('✅ Authentication initialized successfully');
+    } catch (error) {
+        console.error('❌ Failed to initialize authentication:', error.message);
+        console.log('⚠️  Will retry authentication on first API call');
+    }
+}
+
 // Middleware
 app.use(cors);
 app.use(express.json());
@@ -71,9 +83,12 @@ console.log('🎲 Starting live trash detection simulation...');
 scheduleRandomGeneration();
 
 // Start the server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`🚀 Live Trash Detection Simulator running on http://localhost:${PORT}`);
     console.log(`📊 Posting live data to: http://localhost:8080/api/TrashItems/dummy`);
     console.log(`🎯 Random detections: every 20s-3min, 1-6 items per detection`);
     console.log(`🧪 Manual generation: POST http://localhost:${PORT}/generate`);
+    
+    // Initialize authentication after server starts
+    await initializeAuth();
 });

@@ -1,4 +1,16 @@
-﻿@inherits LayoutComponentBase
+﻿@using WasteWatchAIFrontend.Services
+@inherits LayoutComponentBase
+
+<style>
+    .top-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 0.75rem 1rem;
+    }
+</style>
 
 <div class="page">
     <div class="sidebar">
@@ -7,7 +19,9 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+
+
+            <AuthSection />
         </div>
 
         <article class="content px-4">
@@ -21,3 +35,4 @@
     <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
 </div>
+

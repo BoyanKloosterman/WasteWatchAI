@@ -5,11 +5,16 @@
 @using WasteWatchAIFrontend.Models
 @using System.Text.Json.Serialization;
 @using System.Text.Json;
+@using WasteWatchAIFrontend.Components.Layout
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
+@inject IAuthenticationService AuthenticationService
 @using System.Globalization;
+@using WasteWatchAIFrontend.Services
 
 <PageTitle>Reports</PageTitle>
+
+<AuthGuard>
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>
@@ -81,7 +86,7 @@
                                 </button>
                             </li>
                         </ul>
-                            
+
                         <div class="tab-content">
                             <div class="tab-pane fade @(activeTab == "week" ? "show active" : "")" role="tabpanel">
                                 <i class="bi bi-question-circle-fill text-primary"
@@ -105,7 +110,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
 
                     <div class="tab-content">
                         <div class="tab-pane fade @(activeTab == "week" ? "show active" : "")" role="tabpanel">
@@ -384,6 +389,7 @@
         </div>
     </div>
 </div>
+</AuthGuard>
 @code {
     private List<TrashItem> trashItems = new();
     private Dictionary<int, int> trashPerWeek = new();
@@ -569,7 +575,20 @@
         try
         {
             var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
+            var token = await AuthenticationService.GetTokenAsync();
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                httpClient.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+            else
+            {
+                httpClient.DefaultRequestHeaders.Authorization = null;
+            }
+
             var response = await httpClient.GetAsync("api/trashitems/dummy");
+
             if (response.IsSuccessStatusCode)
             {
                 trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
@@ -677,7 +696,7 @@
 
                 MonthlyBenchmark = trashTypeCountPerMonth
                     .OrderBy(kvp => kvp.Key)
-                    .TakeLast(6) 
+                    .TakeLast(6)
                     .Select(kvp => new
                     {
                         MonthCode = kvp.Key,

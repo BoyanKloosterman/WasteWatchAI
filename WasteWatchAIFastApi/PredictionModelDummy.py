@@ -29,6 +29,7 @@ dt_r2_scores = {}
 rf_r2_scores = {}
 available_features = []
 weather_mapping = {}
+jwt_token = None
 
 class PredictionRequest(BaseModel):
     date: str 
@@ -227,6 +228,22 @@ def get_seasonal_temperature(month):
     else:  # Autumn (9, 10, 11)
         return 12.0
 
+def read_password():
+    try:
+        with open('password.txt', 'r') as file:
+            content = file.read().strip()
+            # Parse the password=value format
+            if '=' in content:
+                return content.split('=')[1]
+            return content
+    except FileNotFoundError:
+        print("⚠️  password.txt file not found")
+        return None
+    except Exception as e:
+        print(f"⚠️  Error reading password file: {e}")
+        return None
+    
+
 def load_data_and_train_models():
     """Load dummy data and train both Decision Tree and Random Forest models with retry logic"""
     global dt_models, rf_models, dt_r2_scores, rf_r2_scores, available_features, weather_mapping
@@ -234,7 +251,16 @@ def load_data_and_train_models():
     # Container startup retry configuration
     max_retries = 60  # Increased for container startup
     retry_delay = 10  # Longer delay for container startup
-    base_url = "http://host.docker.internal:8080"  # Since this URL works
+    
+    base_url = "http://host.docker.internal:8080"  # Since this URL works 
+    login_url = f"{base_url}/account/login"
+
+    password = read_password()
+
+    login_credentials = {
+        "email": "serviceaccount@example.com",
+        "password": password
+    }
     
     working_base_url = None
     trash_data = None
@@ -247,45 +273,59 @@ def load_data_and_train_models():
     for attempt in range(1, max_retries + 1):
         try:
             print(f"🎲 Dummy API check {attempt}/{max_retries} ({attempt * retry_delay}s elapsed)")
+
+            # 1. Login to get JWT token
+            print(f"   🔐 Attempting login at {login_url}")
+            login_response = requests.post(login_url, json=login_credentials, timeout=15)
+            print(f"   🔐 Login response: {login_response.status_code} - {login_response.text}")
+            if login_response.status_code != 200:
+                print(f"   ❌ Login failed with status {login_response.status_code}: {login_response.text}")
+                raise Exception("Login failed")
+
             
-            # Test if the API container is responding
-            trash_url = f"{base_url}/api/TrashItems/dummy"  # Use dummy endpoint
-            
-            print(f"   📡 Testing dummy API: {trash_url}")
-            
-            response = requests.get(trash_url, timeout=15)
-            
+            jwt_token = login_response.json().get("accessToken")
+            print(f"   🔑 JWT token received: {jwt_token}... (truncated for security)")
+            if not jwt_token:
+                print(f"   ❌ No token received from login")
+                raise Exception("Token not received")
+
+            headers = {
+                "Authorization": f"Bearer {jwt_token}"
+            }
+
+            # 2. Call dummy API with Authorization header
+            trash_url = f"{base_url}/api/TrashItems/dummy"
+            print(f"   📡 Testing dummy API: {trash_url} with JWT")
+
+            response = requests.get(trash_url, headers=headers, timeout=15)
             if response.status_code == 200:
                 trash_data = response.json()
-                working_base_url = base_url
+                working_base_url = base_url  # Set working URL when successful
                 print(f"🎉 SUCCESS! Dummy API container is ready!")
                 print(f"✅ Loaded {len(trash_data)} dummy trash records")
                 break
             else:
-                print(f"   ⚠️  Dummy API returned status {response.status_code} (container might be starting)")
-                
-        except requests.exceptions.ConnectionError as e:
-            print(f"   ⏳ Connection refused - API container not ready yet")
-        except requests.exceptions.Timeout as e:
-            print(f"   ⏳ Request timeout - API container might be starting")
+                print(f"   ⚠️ Dummy API returned {response.status_code}: {response.text}")
+
         except Exception as e:
-            print(f"   ❌ Unexpected error: {e}")
-        
-        # Wait before retry
-        if attempt < max_retries:
-            print(f"   💤 Waiting {retry_delay}s for API container to start...")
+            print(f"   ⚠️ Attempt failed: {e}")
             time.sleep(retry_delay)
-        else:
-            print("❌ Max wait time exceeded. API container didn't start in time.")
-            return False  # No fallback for dummy - just fail
+
+    if trash_data is None:
+        print("❌ Failed to connect to API after all retries")
+        return False
     
     # If we got trash data, try to get weather data
     if working_base_url and trash_data:
         try:
+            headers = {
+                "Authorization": f"Bearer {jwt_token}"
+            }
+
             weather_url = f"{working_base_url}/api/Weather/"
             print(f"🌤️ Getting dummy weather data: {weather_url}")
             
-            weather_response = requests.get(weather_url, timeout=15)
+            weather_response = requests.get(weather_url, headers=headers, timeout=15)
             
             if weather_response.status_code == 200:
                 weather_data = weather_response.json()
@@ -307,10 +347,20 @@ def load_data_and_train_models():
         print("📊 Processing REAL dummy API data...")
         trash = pd.DataFrame(trash_data)
         
+        # Debug: print columns and first few rows
+        print(f"🔍 Trash data columns: {list(trash.columns)}")
+        print(f"🔍 Trash data shape: {trash.shape}")
+        if len(trash) > 0:
+            print(f"🔍 First trash record: {trash.iloc[0].to_dict()}")
+        
         # Process weather data
         if weather_data:
             print("🌤️ Processing REAL weather data...")
             weather_df = pd.DataFrame(weather_data)
+            print(f"🔍 Weather data columns: {list(weather_df.columns)}")
+            print(f"🔍 Weather data shape: {weather_df.shape}")
+            if len(weather_df) > 0:
+                print(f"🔍 First weather record: {weather_df.iloc[0].to_dict()}")
         else:
             print("🌤️ No weather data available")
             weather_df = pd.DataFrame()  # Empty DataFrame
@@ -333,6 +383,10 @@ def load_data_and_train_models():
         daily_data = daily_summary.pivot(index='datum', columns='litterType', values='count').fillna(0)
         daily_data = daily_data.reset_index()
         
+        # Debug: print daily data structure
+        print(f"🔍 Daily data columns after pivot: {list(daily_data.columns)}")
+        print(f"🔍 Daily data shape: {daily_data.shape}")
+        
         # Add location data (use mean coordinates)
         daily_data['latitude'] = trash.groupby('datum')['latitude'].mean().values
         daily_data['longitude'] = trash.groupby('datum')['longitude'].mean().values
@@ -346,28 +400,41 @@ def load_data_and_train_models():
         # Merge weather data if available
         if len(weather_df) > 0:
             print("🔗 Merging weather data...")
-            # Prepare weather data
-            if 'timestamp' in weather_df.columns:
-                weather_df['datum'] = pd.to_datetime(weather_df['timestamp']).dt.date
-                weather_df = weather_df.rename(columns={
-                    'temperature': 'temperatuur',
-                    'weatherDescription': 'weersverwachting'
-                })
-            elif 'Timestamp' in weather_df.columns:
-                weather_df['datum'] = pd.to_datetime(weather_df['Timestamp']).dt.date
-                weather_df = weather_df.rename(columns={
-                    'Temperature': 'temperatuur',
-                    'WeatherDescription': 'weersverwachting'
-                })
-            
-            # Merge weather data
-            daily_data = pd.merge(daily_data, weather_df[['datum', 'temperatuur', 'weersverwachting']], 
-                               on='datum', how='left')
-            print("✅ Weather data merged successfully")
+            try:
+                # Prepare weather data
+                if 'timestamp' in weather_df.columns:
+                    weather_df['datum'] = pd.to_datetime(weather_df['timestamp']).dt.date
+                    weather_df = weather_df.rename(columns={
+                        'temperature': 'temperatuur',
+                        'weatherDescription': 'weersverwachting'
+                    })
+                elif 'Timestamp' in weather_df.columns:
+                    weather_df['datum'] = pd.to_datetime(weather_df['Timestamp']).dt.date
+                    weather_df = weather_df.rename(columns={
+                        'Temperature': 'temperatuur',
+                        'WeatherDescription': 'weersverwachting'
+                    })
+                
+                # Merge weather data
+                daily_data = pd.merge(daily_data, weather_df[['datum', 'temperatuur', 'weersverwachting']], 
+                                   on='datum', how='left')
+                print("✅ Weather data merged successfully")
+            except Exception as e:
+                print(f"⚠️ Weather merge failed: {e}")
+                # Continue without weather data
+        else:
+            print("⚠️ No weather data to merge")
         
         # Fill missing weather data with defaults (no fallback generation)
-        daily_data['temperatuur'] = daily_data['temperatuur'].fillna(15.0)
-        daily_data['weersverwachting'] = daily_data['weersverwachting'].fillna('Bewolkt')
+        if 'temperatuur' not in daily_data.columns:
+            daily_data['temperatuur'] = 15.0
+        else:
+            daily_data['temperatuur'] = daily_data['temperatuur'].fillna(15.0)
+            
+        if 'weersverwachting' not in daily_data.columns:
+            daily_data['weersverwachting'] = 'Bewolkt'
+        else:
+            daily_data['weersverwachting'] = daily_data['weersverwachting'].fillna('Bewolkt')
         
         # Add calculated features
         daily_data['is_weekend'] = (daily_data['weekday'] >= 5).astype(int)
@@ -641,8 +708,8 @@ def startup_models_dummy():
     else:
         print("Models loaded successfully!")
 
-# Roep startup functie aan
-# startup_models()
+# Call startup function when module is imported
+startup_models_dummy()
 
 @router.post("/predict/dummy", response_model=PredictionResponse)
 async def predict_waste_endpoint(request: PredictionRequest):
@@ -651,9 +718,16 @@ async def predict_waste_endpoint(request: PredictionRequest):
         # Validate date format
         datetime.strptime(request.date, '%Y-%m-%d')
         
-        # Check if models are loaded
+        # Debug: Check model status
+        print(f"🔍 Model check: DT models={len(dt_models)}, RF models={len(rf_models)}")
+        
+        # Check if models are loaded, if not try to load them
         if not dt_models and not rf_models:
-            raise HTTPException(status_code=503, detail="Models not loaded yet")
+            print("❌ Models not loaded yet, attempting to load...")
+            success = load_data_and_train_models()
+            if not success:
+                raise HTTPException(status_code=503, detail="Models could not be loaded - API container may not be ready")
+            print(f"🔍 After reload: DT models={len(dt_models)}, RF models={len(rf_models)}")
         
         # Make prediction (weather is automatically fetched)
         predictions, confidence_scores, all_model_confidence, model_used, avg_confidence, model_used_per_category, weather_data = predict_waste(

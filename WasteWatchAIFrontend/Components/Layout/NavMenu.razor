@@ -1,3 +1,6 @@
+@implements IDisposable
+@rendermode InteractiveServer
+
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">WasteWatchAI</a>
@@ -59,3 +62,27 @@
     </nav>
 </div>
 
+<style>
+    /* No additional styles needed for authentication since it's moved to MainLayout */
+</style>
+
+@code {
+    private Timer? timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Periodiek controleren voor andere doeleinden (backup)
+        timer = new Timer(async _ => 
+        {
+            await InvokeAsync(() =>
+            {
+                StateHasChanged();
+            });
+        }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}

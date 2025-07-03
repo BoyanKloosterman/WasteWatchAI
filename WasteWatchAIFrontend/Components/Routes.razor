@@ -3,4 +3,14 @@
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
+    <NotFound>
+        <PageTitle>Niet gevonden</PageTitle>
+        <LayoutView Layout="typeof(Layout.MainLayout)">
+            <div class="not-found-container">
+                <h1>404 - Pagina niet gevonden</h1>
+                <p>De pagina die je zoekt bestaat niet.</p>
+                <a href="/home" class="btn btn-primary">Terug naar home</a>
+            </div>
+        </LayoutView>
+    </NotFound>
 </Router>

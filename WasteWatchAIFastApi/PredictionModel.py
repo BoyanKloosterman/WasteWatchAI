@@ -29,6 +29,7 @@ dt_r2_scores = {}
 rf_r2_scores = {}
 available_features = []
 weather_mapping = {}
+jwt_token = None
 
 class PredictionRequest(BaseModel):
     date: str 
@@ -227,6 +228,22 @@ def get_seasonal_temperature(month):
     else:  # Autumn (9, 10, 11)
         return 12.0
 
+def read_password():
+    try:
+        with open('password.txt', 'r') as file:
+            content = file.read().strip()
+            # Parse the password=value format
+            if '=' in content:
+                return content.split('=')[1]
+            return content
+    except FileNotFoundError:
+        print("⚠️  password.txt file not found")
+        return None
+    except Exception as e:
+        print(f"⚠️  Error reading password file: {e}")
+        return None
+    
+
 def load_data_and_train_models():
     """Load REAL data and train both Decision Tree and Random Forest models with retry logic"""
     global dt_models, rf_models, dt_r2_scores, rf_r2_scores, available_features, weather_mapping
@@ -236,6 +253,15 @@ def load_data_and_train_models():
     retry_delay = 10  # Longer delay for container startup
     base_url = "http://host.docker.internal:8080"  # Since this URL works
     
+    login_url = f"{base_url}/account/login"
+    
+    password = read_password()
+
+    login_credentials = {
+        "email": "serviceaccount@example.com",
+        "password": password
+    }
+
     working_base_url = None
     trash_data = None
     weather_data = None
@@ -246,57 +272,71 @@ def load_data_and_train_models():
     # Keep trying until the API container is ready
     for attempt in range(1, max_retries + 1):
         try:
-            print(f"🏗️  Real API check {attempt}/{max_retries} ({attempt * retry_delay}s elapsed)")
+            print(f"🎲 Dummy API check {attempt}/{max_retries} ({attempt * retry_delay}s elapsed)")
+
+            # 1. Login to get JWT token
+            print(f"   🔐 Attempting login at {login_url}")
+            login_response = requests.post(login_url, json=login_credentials, timeout=15)
+            print(f"   🔐 Login response: {login_response.status_code} - {login_response.text}")
+            if login_response.status_code != 200:
+                print(f"   ❌ Login failed with status {login_response.status_code}: {login_response.text}")
+                raise Exception("Login failed")
+
             
-            # Test if the API container is responding - USE REAL TRASH ENDPOINT
-            trash_url = f"{base_url}/api/TrashItems/trash"  # REAL data endpoint (not dummy)
-            
-            print(f"   📡 Testing real API: {trash_url}")
-            
-            response = requests.get(trash_url, timeout=15)
-            
+            jwt_token = login_response.json().get("accessToken")
+            print(f"   🔑 JWT token received: {jwt_token}... (truncated for security)")
+            if not jwt_token:
+                print(f"   ❌ No token received from login")
+                raise Exception("Token not received")
+
+            headers = {
+                "Authorization": f"Bearer {jwt_token}"
+            }
+
+            # 2. Call dummy API with Authorization header
+            trash_url = f"{base_url}/api/TrashItems/trash"
+            print(f"   📡 Testing dummy API: {trash_url} with JWT")
+
+            response = requests.get(trash_url, headers=headers, timeout=15)
             if response.status_code == 200:
                 trash_data = response.json()
-                working_base_url = base_url
-                print(f"🎉 SUCCESS! Real API container is ready!")
-                print(f"✅ Loaded {len(trash_data)} REAL trash records")
+                working_base_url = base_url  # Set working URL when successful
+                print(f"🎉 SUCCESS! Dummy API container is ready!")
+                print(f"✅ Loaded {len(trash_data)} dummy trash records")
                 break
             else:
-                print(f"   ⚠️  Real API returned status {response.status_code} (container might be starting)")
-                
-        except requests.exceptions.ConnectionError as e:
-            print(f"   ⏳ Connection refused - API container not ready yet")
-        except requests.exceptions.Timeout as e:
-            print(f"   ⏳ Request timeout - API container might be starting")
+                print(f"   ⚠️ Dummy API returned {response.status_code}: {response.text}")
+
         except Exception as e:
-            print(f"   ❌ Unexpected error: {e}")
-        
-        # Wait before retry
-        if attempt < max_retries:
-            print(f"   💤 Waiting {retry_delay}s for API container to start...")
+            print(f"   ⚠️ Attempt failed: {e}")
             time.sleep(retry_delay)
-        else:
-            print("❌ Max wait time exceeded. API container didn't start in time.")
-            return False  # No fallback for real data - just fail
+
+    if trash_data is None:
+        print("❌ Failed to connect to API after all retries")
+        return False
     
     # If we got trash data, try to get weather data
     if working_base_url and trash_data:
         try:
+            headers = {
+                "Authorization": f"Bearer {jwt_token}"
+            }
+
             weather_url = f"{working_base_url}/api/Weather/"
-            print(f"🌤️ Getting real weather data: {weather_url}")
+            print(f"🌤️ Getting dummy weather data: {weather_url}")
             
-            weather_response = requests.get(weather_url, timeout=15)
+            weather_response = requests.get(weather_url, headers=headers, timeout=15)
             
             if weather_response.status_code == 200:
                 weather_data = weather_response.json()
-                print(f"✅ Real weather data loaded! {len(weather_data)} records")
+                print(f"✅ Dummy weather data loaded! {len(weather_data)} records")
             else:
                 print(f"⚠️  Weather API returned status {weather_response.status_code}")
-                print("⚠️  Continuing with real trash data only")
+                print("⚠️  Continuing with dummy trash data only")
                 
         except Exception as e:
             print(f"⚠️  Weather API error: {e}")
-            print("⚠️  Continuing with real trash data only")
+            print("⚠️  Continuing with dummy trash data only")
     
     # Process the data (only real API data, no fallback)
     try:

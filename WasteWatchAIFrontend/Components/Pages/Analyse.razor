@@ -1,497 +1,499 @@
 ﻿@page "/analyse"
 @rendermode InteractiveServer
 
-<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 analyse-centered-container">
+<AuthGuard>
+    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 analyse-centered-container">
 
-    <!-- Breadcrumb -->
-    <nav aria-label="breadcrumb" class="pt-3">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="" class="text-decoration-none">Dashboard</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Analyse</li>
-        </ol>
-    </nav>
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="pt-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="" class="text-decoration-none">Dashboard</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Analyse</li>
+            </ol>
+        </nav>
 
-    <h1 class="h2 mb-4">Datafilters</h1>
-    <div class="mb-3">
-        <button class="btn btn-outline-primary"
-                @onclick="async () => { useDummyData = !useDummyData; await ToggleDataMode(); }">
-            <i class="fas @(useDummyData ? "fa-database" : "fa-vial") me-2"></i>
-            Gebruik @(useDummyData ? "echte data" : "dummy data")
-        </button>
-    </div>
-
-    @if (isLoading)
-    {
-        <div class="d-flex justify-content-center">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
+        <h1 class="h2 mb-4">Datafilters</h1>
+        <div class="mb-3">
+            <button class="btn btn-outline-primary"
+                    @onclick="async () => { useDummyData = !useDummyData; await ToggleDataMode(); }">
+                <i class="fas @(useDummyData ? "fa-database" : "fa-vial") me-2"></i>
+                Gebruik @(useDummyData ? "echte data" : "dummy data")
+            </button>
         </div>
-    }
-    else
-    {
-        <!-- Filters Section -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="card-title mb-0">Datafilters</h5>
-                    @if (HasActiveFilters())
-                    {
-                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ResetFilters" title="Alle filters wissen">
-                            <i class="fas fa-times me-1"></i>
-                            Reset
-                        </button>
-                    }
+
+        @if (isLoading)
+        {
+            <div class="d-flex justify-content-center">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
                 </div>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label for="periode" class="form-label">Periode</label>
-                        <select class="form-select" id="periode" @bind="selectedPeriod" @bind:after="OnFilterChanged">
-                            <option value="">Selecteer datumbereik</option>
-                            <option value="week">Deze week</option>
-                            <option value="month">Deze maand</option>
-                            <option value="year">Dit jaar</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="locatie" class="form-label">Locatie</label>
-                        <select class="form-select" id="locatie" @bind="selectedLocation" @bind:after="OnFilterChanged">
-                            <option value="">Kies locatie</option>
-                            @foreach (var location in availableLocations)
-                            {
-                                <option value="@location">@location</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="afvalcategorie" class="form-label">Afvalcategorie</label>
-                        <select class="form-select" id="afvalcategorie" @bind="selectedCategory" @bind:after="OnFilterChanged">
-                            <option value="">Selecteer categorie</option>
-                            <option value="plastic">Plastic</option>
-                            <option value="papier">Papier</option>
-                            <option value="gft">GFT/Organisch</option>
-                            <option value="glas">Glas</option>
-                        </select>
-                    </div>
-                </div>
-                @if (HasActiveFilters())
-                {
-                    <div class="mt-3">
-                        <small class="text-muted">
-                            <i class="fas fa-filter me-1"></i>
-                            Actieve filters: @GetFilterSummary()
-                        </small>
-                    </div>
-                }
             </div>
-        </div>
-
-        <!-- Data Summary -->
-        <div class="alert alert-info mb-4">
-            <i class="fas fa-info-circle me-2"></i>
-            @if (HasActiveFilters())
-            {
-                <span>Totaal @GetDisplayItemCount() afvalitems @(GetDisplayItemCount() == trashItems.Count ? "geladen" : "gevonden") uit de database.</span>
-            }
-            else
-            {
-                <span>Totaal @trashItems.Count afvalitems geladen uit de database.</span>
-            }
-        </div>
-
-        <!-- Chart Section -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Overzicht afvaldata</h5>
-
-                <!-- Chart Tabs -->
-                <ul class="nav nav-tabs chart-tabs mb-3" id="chartTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="typeverdeling-tab" data-bs-toggle="tab" data-bs-target="#typeverdeling" type="button" role="tab">
-                            Afval Typeverdeling per Locatie
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="frequentie-tab" data-bs-toggle="tab" data-bs-target="#frequentie" type="button" role="tab">
-                            Frequentie Analyse
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="correlaties-tab" data-bs-toggle="tab" data-bs-target="#correlaties" type="button" role="tab">
-                            Correlaties
-                        </button>
-                    </li>
-                </ul>
-
-                <!-- Tab Content -->
-                <div class="tab-content" id="chartTabContent">
-                    <div class="tab-pane fade show active" id="typeverdeling" role="tabpanel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div>
-                                <h6 class="mb-1">Afval Typeverdeling per Locatie</h6>
-                                <p class="text-muted small mb-0">Analyse van verschillende afvaltypes per locatie</p>
-                            </div>
-                            <i class="bi bi-question-circle-fill text-primary"
-                               style="cursor: pointer;"
-                               data-bs-toggle="popover"
-                               data-bs-trigger="click"
-                               data-bs-placement="top"
-                               title="Uitleg grafiek"
-                               data-bs-content="Deze grafiek toont de verdeling van verschillende afvaltypes per locatie. Elke kleur staat voor een type afval (Plastic, Papier, Glas, Organisch). De grafiek toont alleen de top 5 locaties met de meeste afvaldetecties.">
-                            </i>
-                        </div>
-                        <p class="text-muted small mb-2">
-                            Data voor: @GetFilterSummary()
-                        </p>
-
-                        @if (locationChartData.Any())
+        }
+        else
+        {
+            <!-- Filters Section -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title mb-0">Datafilters</h5>
+                        @if (HasActiveFilters())
                         {
-                            <!-- Chart Container -->
-                            <div class="chart-container" style="position: relative; height: 400px; width: 100%;">
-                                <canvas id="typeDistributionChart"></canvas>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="alert alert-warning">
-                                Geen data beschikbaar voor locatie-analyse.
-                            </div>
-                        }
-                    </div>
-
-                    <div class="tab-pane fade" id="frequentie" role="tabpanel">
-                        <div class="frequency-chart-header mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <div>
-                                    <h6 class="mb-1">Frequentie Analyse</h6>
-                                    <p class="text-muted small mb-0">Afvaldetecties per tijdstip van de dag</p>
-                                </div>
-                                <div class="d-flex align-items-center gap-3">
-                                    <div class="frequency-filter">
-                                        <select class="form-select form-select-sm" style="width: auto;" @bind="selectedFrequencyDay" @bind:after="OnFrequencyFilterChanged">
-                                            <option value="">Alle dagen</option>
-                                            <option value="today">Vandaag</option>
-                                            <option value="yesterday">Gisteren</option>
-                                            <option value="day_2">2 dagen geleden</option>
-                                            <option value="day_3">3 dagen geleden</option>
-                                            <option value="day_4">4 dagen geleden</option>
-                                            <option value="day_5">5 dagen geleden</option>
-                                            <option value="day_6">6 dagen geleden</option>
-                                            <option value="day_7">7 dagen geleden</option>
-                                        </select>
-                                    </div>
-                                    <i class="bi bi-question-circle-fill text-primary"
-                                       style="cursor: pointer;"
-                                       data-bs-toggle="popover"
-                                       data-bs-trigger="click"
-                                       data-bs-placement="top"
-                                       title="Uitleg grafiek"
-                                       data-bs-content="Deze grafiek toont het aantal afvaldetecties per uur van de dag (06:00-22:00). U kunt een specifieke dag selecteren om de frequentie voor die dag te bekijken. Dit helpt bij het identificeren van piekuren voor afvaldetecties.">
-                                    </i>
-                                </div>
-                            </div>
-                            <p class="text-muted small mb-2">
-                                Data voor: @GetFilterSummary() - Dag: @GetFrequencyFilterSummary()
-                            </p>
-                        </div>
-
-                        @if (frequencyData.Any())
-                        {
-                            <!-- Chart Container -->
-                            <div class="chart-container" style="position: relative; height: 400px; width: 100%;">
-                                <canvas id="frequencyChart"></canvas>
-                            </div>
-
-                            <!-- Add summary info -->
-                            <div class="mt-3">
-                                <small class="text-muted">
-                                    <i class="fas fa-chart-bar me-1"></i>
-                                    Totaal @frequencyData.Sum(f => f.Value) detecties voor @GetFrequencyFilterSummary()
-                                    @if (frequencyData.Any(f => f.Value > 0))
-                                    {
-                                        var peakHour = frequencyData.OrderByDescending(f => f.Value).First();
-                                        <span> | Piek om @peakHour.Time (@peakHour.Value detecties)</span>
-                                    }
-                                </small>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="alert alert-warning">
-                                Geen data beschikbaar voor frequentieanalyse op @GetFrequencyFilterSummary().
-                            </div>
-                        }
-                    </div>
-
-                    <div class="tab-pane fade" id="correlaties" role="tabpanel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div>
-                                <h6 class="mb-1">Correlatie: Weer & Afval</h6>
-                                <p class="text-muted small mb-0">Analyse van de relatie tussen weersomstandigheden en afvalvolume</p>
-                                @if (HasActiveFilters())
-                                {
-                                    <p class="text-info small mb-0">
-                                        <i class="fas fa-filter me-1"></i>
-                                        Gefilterde data: @GetFilterSummary()
-                                    </p>
-                                }
-                            </div>
-                            <i class="bi bi-question-circle-fill text-primary"
-                               style="cursor: pointer;"
-                               data-bs-toggle="popover"
-                               data-bs-trigger="click"
-                               data-bs-placement="top"
-                               title="Uitleg correlatie-analyse"
-                               data-bs-content="Deze sectie toont de statistische relatie tussen weersomstandigheden en afvalvolume. De correlatie coëfficiënt (-1 tot 1) geeft de sterkte van het verband aan. Positieve waarden betekenen meer afval bij hoger weer, negatieve waarden betekenen minder afval.">
-                            </i>
-                        </div>
-
-                        @if (isLoadingCorrelation)
-                        {
-                            <div class="d-flex justify-content-center py-4">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Correlatie wordt geladen...</span>
-                                </div>
-                                @if (HasActiveFilters())
-                                {
-                                    <p class="ms-3 text-muted">Herberekenen met gefilterde data...</p>
-                                }
-                            </div>
-                        }
-                        else if (!string.IsNullOrEmpty(correlationError))
-                        {
-                            <div class="alert alert-danger">
-                                <i class="fas fa-exclamation-triangle me-2"></i>
-                                @correlationError
-                            </div>
-                            <button class="btn btn-primary" @onclick="LoadCorrelationData">
-                                <i class="fas fa-redo me-2"></i>Opnieuw proberen
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ResetFilters" title="Alle filters wissen">
+                                <i class="fas fa-times me-1"></i>
+                                Reset
                             </button>
                         }
-                        else if (correlationData != null)
-                        {
-                            <!-- Correlation Statistics -->
-                            <div class="row mb-4">
-                                <div class="col-md-4">
-                                    <div class="card correlation-stat-card text-center">
-                                        <div class="card-body">
-                                            <div class="correlation-icon mb-2">
-                                                <i class="fas fa-chart-line"></i>
-                                            </div>
-                                            <h3 class="correlation-value @(correlationData.CorrelationCoefficient > 0 ? "text-success" : correlationData.CorrelationCoefficient < 0 ? "text-danger" : "text-muted")">
-                                                @correlationData.CorrelationCoefficient.ToString("0.00")
-                                            </h3>
-                                            <p class="correlation-label">Correlatie Coëfficiënt</p>
-                                            <small class="text-muted">@correlationData.CorrelationStrength</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card correlation-stat-card text-center">
-                                        <div class="card-body">
-                                            <div class="correlation-icon mb-2 text-warning">
-                                                <i class="fas fa-sun"></i>
-                                            </div>
-                                            <h3 class="correlation-value text-warning">
-                                                @correlationData.SunnyWeatherPercentage.ToString("0.0")%
-                                            </h3>
-                                            <p class="correlation-label">Impact Zonnig Weer</p>
-                                            <small class="text-muted">Afval t.o.v. gemiddelde</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card correlation-stat-card text-center">
-                                        <div class="card-body">
-                                            <div class="correlation-icon mb-2 text-info">
-                                                <i class="fas fa-cloud-rain"></i>
-                                            </div>
-                                            <h3 class="correlation-value text-info">
-                                                @correlationData.RainyWeatherPercentage.ToString("0.0")%
-                                            </h3>
-                                            <p class="correlation-label">Impact Regenachtig Weer</p>
-                                            <small class="text-muted">Afval t.o.v. gemiddelde</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="periode" class="form-label">Periode</label>
+                            <select class="form-select" id="periode" @bind="selectedPeriod" @bind:after="OnFilterChanged">
+                                <option value="">Selecteer datumbereik</option>
+                                <option value="week">Deze week</option>
+                                <option value="month">Deze maand</option>
+                                <option value="year">Dit jaar</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="locatie" class="form-label">Locatie</label>
+                            <select class="form-select" id="locatie" @bind="selectedLocation" @bind:after="OnFilterChanged">
+                                <option value="">Kies locatie</option>
+                                @foreach (var location in availableLocations)
+                                {
+                                    <option value="@location">@location</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="afvalcategorie" class="form-label">Afvalcategorie</label>
+                            <select class="form-select" id="afvalcategorie" @bind="selectedCategory" @bind:after="OnFilterChanged">
+                                <option value="">Selecteer categorie</option>
+                                <option value="plastic">Plastic</option>
+                                <option value="papier">Papier</option>
+                                <option value="gft">GFT/Organisch</option>
+                                <option value="glas">Glas</option>
+                            </select>
+                        </div>
+                    </div>
+                    @if (HasActiveFilters())
+                    {
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-filter me-1"></i>
+                                Actieve filters: @GetFilterSummary()
+                            </small>
+                        </div>
+                    }
+                </div>
+            </div>
 
-                            <!-- Main Correlation Chart -->
-                            <div class="card mb-4">
-                                <div class="card-header">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-chart-line me-2"></i>Temperatuur vs Afval Correlatie
-                                        </h6>
+            <!-- Data Summary -->
+            <div class="alert alert-info mb-4">
+                <i class="fas fa-info-circle me-2"></i>
+                @if (HasActiveFilters())
+                {
+                    <span>Totaal @GetDisplayItemCount() afvalitems @(GetDisplayItemCount() == trashItems.Count ? "geladen" : "gevonden") uit de database.</span>
+                }
+                else
+                {
+                    <span>Totaal @trashItems.Count afvalitems geladen uit de database.</span>
+                }
+            </div>
+
+            <!-- Chart Section -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Overzicht afvaldata</h5>
+
+                    <!-- Chart Tabs -->
+                    <ul class="nav nav-tabs chart-tabs mb-3" id="chartTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="typeverdeling-tab" data-bs-toggle="tab" data-bs-target="#typeverdeling" type="button" role="tab">
+                                Afval Typeverdeling per Locatie
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="frequentie-tab" data-bs-toggle="tab" data-bs-target="#frequentie" type="button" role="tab">
+                                Frequentie Analyse
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="correlaties-tab" data-bs-toggle="tab" data-bs-target="#correlaties" type="button" role="tab">
+                                Correlaties
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="chartTabContent">
+                        <div class="tab-pane fade show active" id="typeverdeling" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h6 class="mb-1">Afval Typeverdeling per Locatie</h6>
+                                    <p class="text-muted small mb-0">Analyse van verschillende afvaltypes per locatie</p>
+                                </div>
+                                <i class="bi bi-question-circle-fill text-primary"
+                                   style="cursor: pointer;"
+                                   data-bs-toggle="popover"
+                                   data-bs-trigger="click"
+                                   data-bs-placement="top"
+                                   title="Uitleg grafiek"
+                                   data-bs-content="Deze grafiek toont de verdeling van verschillende afvaltypes per locatie. Elke kleur staat voor een type afval (Plastic, Papier, Glas, Organisch). De grafiek toont alleen de top 5 locaties met de meeste afvaldetecties.">
+                                </i>
+                            </div>
+                            <p class="text-muted small mb-2">
+                                Data voor: @GetFilterSummary()
+                            </p>
+
+                            @if (locationChartData.Any())
+                            {
+                                <!-- Chart Container -->
+                                <div class="chart-container" style="position: relative; height: 400px; width: 100%;">
+                                    <canvas id="typeDistributionChart"></canvas>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-warning">
+                                    Geen data beschikbaar voor locatie-analyse.
+                                </div>
+                            }
+                        </div>
+
+                        <div class="tab-pane fade" id="frequentie" role="tabpanel">
+                            <div class="frequency-chart-header mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div>
+                                        <h6 class="mb-1">Frequentie Analyse</h6>
+                                        <p class="text-muted small mb-0">Afvaldetecties per tijdstip van de dag</p>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="frequency-filter">
+                                            <select class="form-select form-select-sm" style="width: auto;" @bind="selectedFrequencyDay" @bind:after="OnFrequencyFilterChanged">
+                                                <option value="">Alle dagen</option>
+                                                <option value="today">Vandaag</option>
+                                                <option value="yesterday">Gisteren</option>
+                                                <option value="day_2">2 dagen geleden</option>
+                                                <option value="day_3">3 dagen geleden</option>
+                                                <option value="day_4">4 dagen geleden</option>
+                                                <option value="day_5">5 dagen geleden</option>
+                                                <option value="day_6">6 dagen geleden</option>
+                                                <option value="day_7">7 dagen geleden</option>
+                                            </select>
+                                        </div>
                                         <i class="bi bi-question-circle-fill text-primary"
                                            style="cursor: pointer;"
                                            data-bs-toggle="popover"
                                            data-bs-trigger="click"
                                            data-bs-placement="top"
-                                           title="Temperatuur vs Afval grafiek"
-                                           data-bs-content="Deze gecombineerde grafiek toont de relatie tussen dagelijkse temperatuur (rode lijn) en afvalvolume (blauwe balken). De linker Y-as toont temperatuur in °C, de rechter Y-as toont aantal afvalitems.">
+                                           title="Uitleg grafiek"
+                                           data-bs-content="Deze grafiek toont het aantal afvaldetecties per uur van de dag (06:00-22:00). U kunt een specifieke dag selecteren om de frequentie voor die dag te bekijken. Dit helpt bij het identificeren van piekuren voor afvaldetecties.">
                                         </i>
                                     </div>
                                 </div>
-                                <div class="card-body">
-                                    <div class="chart-container" style="position: relative; height: 400px; width: 100%;">
-                                        <canvas id="correlationChart"></canvas>
-                                    </div>
-                                </div>
+                                <p class="text-muted small mb-2">
+                                    Data voor: @GetFilterSummary() - Dag: @GetFrequencyFilterSummary()
+                                </p>
                             </div>
 
-                            <!-- Additional Charts Row -->
-                            <div class="row mb-4">
-                                <!-- Weather Distribution Chart -->
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <h6 class="mb-0">
-                                                    <i class="fas fa-cloud me-2"></i>Weer Verdeling
-                                                </h6>
-                                                <i class="bi bi-question-circle-fill text-primary"
-                                                   style="cursor: pointer;"
-                                                   data-bs-toggle="popover"
-                                                   data-bs-trigger="click"
-                                                   data-bs-placement="top"
-                                                   title="Weer verdeling grafiek"
-                                                   data-bs-content="Deze donut grafiek toont de verdeling van verschillende weersomstandigheden in de geanalyseerde periode. Elk segment representeert het percentage dagen met dat specifieke weertype.">
-                                                </i>
-                                            </div>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
-                                                <canvas id="weatherDistributionChart"></canvas>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Scatter Plot -->
-                                <div class="col-md-6">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <h6 class="mb-0">
-                                                    <i class="fas fa-chart-scatter me-2"></i>Correlatie Scatter Plot
-                                                </h6>
-                                                <i class="bi bi-question-circle-fill text-primary"
-                                                   style="cursor: pointer;"
-                                                   data-bs-toggle="popover"
-                                                   data-bs-trigger="click"
-                                                   data-bs-placement="top"
-                                                   title="Scatter plot uitleg"
-                                                   data-bs-content="Deze scatter plot toont elk datapunt als een punt met temperatuur op de X-as en afvalvolume op de Y-as. Een trendlijn zou een positieve of negatieve correlatie kunnen tonen. Punten dichter bij een denkbeeldige lijn duiden op een sterkere correlatie.">
-                                                </i>
-                                            </div>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
-                                                <canvas id="scatterChart"></canvas>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Temperature Statistics -->
-                            @if (correlationData.ChartData.TemperatureData.Temperature.Any())
+                            @if (frequencyData.Any())
                             {
+                                <!-- Chart Container -->
+                                <div class="chart-container" style="position: relative; height: 400px; width: 100%;">
+                                    <canvas id="frequencyChart"></canvas>
+                                </div>
+
+                                <!-- Add summary info -->
+                                <div class="mt-3">
+                                    <small class="text-muted">
+                                        <i class="fas fa-chart-bar me-1"></i>
+                                        Totaal @frequencyData.Sum(f => f.Value) detecties voor @GetFrequencyFilterSummary()
+                                        @if (frequencyData.Any(f => f.Value > 0))
+                                        {
+                                            var peakHour = frequencyData.OrderByDescending(f => f.Value).First();
+                                            <span> | Piek om @peakHour.Time (@peakHour.Value detecties)</span>
+                                        }
+                                    </small>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-warning">
+                                    Geen data beschikbaar voor frequentieanalyse op @GetFrequencyFilterSummary().
+                                </div>
+                            }
+                        </div>
+
+                        <div class="tab-pane fade" id="correlaties" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h6 class="mb-1">Correlatie: Weer & Afval</h6>
+                                    <p class="text-muted small mb-0">Analyse van de relatie tussen weersomstandigheden en afvalvolume</p>
+                                    @if (HasActiveFilters())
+                                    {
+                                        <p class="text-info small mb-0">
+                                            <i class="fas fa-filter me-1"></i>
+                                            Gefilterde data: @GetFilterSummary()
+                                        </p>
+                                    }
+                                </div>
+                                <i class="bi bi-question-circle-fill text-primary"
+                                   style="cursor: pointer;"
+                                   data-bs-toggle="popover"
+                                   data-bs-trigger="click"
+                                   data-bs-placement="top"
+                                   title="Uitleg correlatie-analyse"
+                                   data-bs-content="Deze sectie toont de statistische relatie tussen weersomstandigheden en afvalvolume. De correlatie coëfficiënt (-1 tot 1) geeft de sterkte van het verband aan. Positieve waarden betekenen meer afval bij hoger weer, negatieve waarden betekenen minder afval.">
+                                </i>
+                            </div>
+
+                            @if (isLoadingCorrelation)
+                            {
+                                <div class="d-flex justify-content-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Correlatie wordt geladen...</span>
+                                    </div>
+                                    @if (HasActiveFilters())
+                                    {
+                                        <p class="ms-3 text-muted">Herberekenen met gefilterde data...</p>
+                                    }
+                                </div>
+                            }
+                            else if (!string.IsNullOrEmpty(correlationError))
+                            {
+                                <div class="alert alert-danger">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    @correlationError
+                                </div>
+                                <button class="btn btn-primary" @onclick="LoadCorrelationData">
+                                    <i class="fas fa-redo me-2"></i>Opnieuw proberen
+                                </button>
+                            }
+                            else if (correlationData != null)
+                            {
+                                <!-- Correlation Statistics -->
+                                <div class="row mb-4">
+                                    <div class="col-md-4">
+                                        <div class="card correlation-stat-card text-center">
+                                            <div class="card-body">
+                                                <div class="correlation-icon mb-2">
+                                                    <i class="fas fa-chart-line"></i>
+                                                </div>
+                                                <h3 class="correlation-value @(correlationData.CorrelationCoefficient > 0 ? "text-success" : correlationData.CorrelationCoefficient < 0 ? "text-danger" : "text-muted")">
+                                                    @correlationData.CorrelationCoefficient.ToString("0.00")
+                                                </h3>
+                                                <p class="correlation-label">Correlatie Coëfficiënt</p>
+                                                <small class="text-muted">@correlationData.CorrelationStrength</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card correlation-stat-card text-center">
+                                            <div class="card-body">
+                                                <div class="correlation-icon mb-2 text-warning">
+                                                    <i class="fas fa-sun"></i>
+                                                </div>
+                                                <h3 class="correlation-value text-warning">
+                                                    @correlationData.SunnyWeatherPercentage.ToString("0.0")%
+                                                </h3>
+                                                <p class="correlation-label">Impact Zonnig Weer</p>
+                                                <small class="text-muted">Afval t.o.v. gemiddelde</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card correlation-stat-card text-center">
+                                            <div class="card-body">
+                                                <div class="correlation-icon mb-2 text-info">
+                                                    <i class="fas fa-cloud-rain"></i>
+                                                </div>
+                                                <h3 class="correlation-value text-info">
+                                                    @correlationData.RainyWeatherPercentage.ToString("0.0")%
+                                                </h3>
+                                                <p class="correlation-label">Impact Regenachtig Weer</p>
+                                                <small class="text-muted">Afval t.o.v. gemiddelde</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Main Correlation Chart -->
                                 <div class="card mb-4">
                                     <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-thermometer-half me-2"></i>Temperatuur Statistieken
-                                        </h6>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-chart-line me-2"></i>Temperatuur vs Afval Correlatie
+                                            </h6>
+                                            <i class="bi bi-question-circle-fill text-primary"
+                                               style="cursor: pointer;"
+                                               data-bs-toggle="popover"
+                                               data-bs-trigger="click"
+                                               data-bs-placement="top"
+                                               title="Temperatuur vs Afval grafiek"
+                                               data-bs-content="Deze gecombineerde grafiek toont de relatie tussen dagelijkse temperatuur (rode lijn) en afvalvolume (blauwe balken). De linker Y-as toont temperatuur in °C, de rechter Y-as toont aantal afvalitems.">
+                                            </i>
+                                        </div>
                                     </div>
                                     <div class="card-body">
-                                        @{
-                                            var avgTemp = correlationData.ChartData.TemperatureData.Temperature.Average();
-                                            var maxTemp = correlationData.ChartData.TemperatureData.Temperature.Max();
-                                            var minTemp = correlationData.ChartData.TemperatureData.Temperature.Min();
-                                        }
+                                        <div class="chart-container" style="position: relative; height: 400px; width: 100%;">
+                                            <canvas id="correlationChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                        <div class="row text-center">
-                                            <div class="col-md-3">
-                                                <h5 class="text-danger">@maxTemp.ToString("0.0")°C</h5>
-                                                <small class="text-muted">Maximum</small>
+                                <!-- Additional Charts Row -->
+                                <div class="row mb-4">
+                                    <!-- Weather Distribution Chart -->
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <h6 class="mb-0">
+                                                        <i class="fas fa-cloud me-2"></i>Weer Verdeling
+                                                    </h6>
+                                                    <i class="bi bi-question-circle-fill text-primary"
+                                                       style="cursor: pointer;"
+                                                       data-bs-toggle="popover"
+                                                       data-bs-trigger="click"
+                                                       data-bs-placement="top"
+                                                       title="Weer verdeling grafiek"
+                                                       data-bs-content="Deze donut grafiek toont de verdeling van verschillende weersomstandigheden in de geanalyseerde periode. Elk segment representeert het percentage dagen met dat specifieke weertype.">
+                                                    </i>
+                                                </div>
                                             </div>
-                                            <div class="col-md-3">
-                                                <h5 class="text-primary">@avgTemp.ToString("0.0")°C</h5>
-                                                <small class="text-muted">Gemiddeld</small>
+                                            <div class="card-body">
+                                                <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+                                                    <canvas id="weatherDistributionChart"></canvas>
+                                                </div>
                                             </div>
-                                            <div class="col-md-3">
-                                                <h5 class="text-info">@minTemp.ToString("0.0")°C</h5>
-                                                <small class="text-muted">Minimum</small>
+                                        </div>
+                                    </div>
+
+                                    <!-- Scatter Plot -->
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <h6 class="mb-0">
+                                                        <i class="fas fa-chart-scatter me-2"></i>Correlatie Scatter Plot
+                                                    </h6>
+                                                    <i class="bi bi-question-circle-fill text-primary"
+                                                       style="cursor: pointer;"
+                                                       data-bs-toggle="popover"
+                                                       data-bs-trigger="click"
+                                                       data-bs-placement="top"
+                                                       title="Scatter plot uitleg"
+                                                       data-bs-content="Deze scatter plot toont elk datapunt als een punt met temperatuur op de X-as en afvalvolume op de Y-as. Een trendlijn zou een positieve of negatieve correlatie kunnen tonen. Punten dichter bij een denkbeeldige lijn duiden op een sterkere correlatie.">
+                                                    </i>
+                                                </div>
                                             </div>
-                                            <div class="col-md-3">
-                                                <h5 class="text-success">@correlationData.ChartData.TemperatureData.TrashCount.Sum()</h5>
-                                                <small class="text-muted">Totaal Afval Items</small>
+                                            <div class="card-body">
+                                                <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+                                                    <canvas id="scatterChart"></canvas>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Temperature Statistics -->
+                                @if (correlationData.ChartData.TemperatureData.Temperature.Any())
+                                {
+                                    <div class="card mb-4">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-thermometer-half me-2"></i>Temperatuur Statistieken
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            @{
+                                                var avgTemp = correlationData.ChartData.TemperatureData.Temperature.Average();
+                                                var maxTemp = correlationData.ChartData.TemperatureData.Temperature.Max();
+                                                var minTemp = correlationData.ChartData.TemperatureData.Temperature.Min();
+                                            }
+
+                                            <div class="row text-center">
+                                                <div class="col-md-3">
+                                                    <h5 class="text-danger">@maxTemp.ToString("0.0")°C</h5>
+                                                    <small class="text-muted">Maximum</small>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <h5 class="text-primary">@avgTemp.ToString("0.0")°C</h5>
+                                                    <small class="text-muted">Gemiddeld</small>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <h5 class="text-info">@minTemp.ToString("0.0")°C</h5>
+                                                    <small class="text-muted">Minimum</small>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <h5 class="text-success">@correlationData.ChartData.TemperatureData.TrashCount.Sum()</h5>
+                                                    <small class="text-muted">Totaal Afval Items</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+
+                                <!-- Insights -->
+                                @if (correlationData.Insights.Any())
+                                {
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-lightbulb me-2"></i>Inzichten
+                                            </h6>
+                                        </div>
+                                        <div class="card-body">
+                                            @foreach (var insight in correlationData.Insights)
+                                            {
+                                                <div class="alert alert-info mb-2">
+                                                    <i class="fas fa-info-circle me-2"></i>@insight
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
                             }
 
-                            <!-- Insights -->
-                            @if (correlationData.Insights.Any())
-                            {
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-lightbulb me-2"></i>Inzichten
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        @foreach (var insight in correlationData.Insights)
-                                        {
-                                            <div class="alert alert-info mb-2">
-                                                <i class="fas fa-info-circle me-2"></i>@insight
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-                            }
-                        }
+                        </div>
 
                     </div>
-
                 </div>
             </div>
-        </div>
 
-        <!-- Dynamic Insights based on location data -->
-        <h5 class="mb-3">Data Inzichten</h5>
+            <!-- Dynamic Insights based on location data -->
+            <h5 class="mb-3">Data Inzichten</h5>
 
-        @if (locationChartData.Any())
-        {
-            var topLocation = locationChartData.First();
-            var topWasteType = topLocation.TypeCounts.OrderByDescending(kvp => kvp.Value).First();
+            @if (locationChartData.Any())
+            {
+                var topLocation = locationChartData.First();
+                var topWasteType = topLocation.TypeCounts.OrderByDescending(kvp => kvp.Value).First();
 
-            <div class="card mb-3">
-                <div class="card-body">
-                    <span class="badge insight-badge mb-2">Inzicht</span>
-                    <h6 class="card-title">Meest vervuilde locatie</h6>
-                    <p class="card-text text-muted">
-                        @topLocation.LocationName heeft de meeste afvalmeldingen (@topLocation.TotalCount items),
-                        vooral @topWasteType.Key (@topWasteType.Value items).
-                    </p>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <span class="badge insight-badge mb-2">Inzicht</span>
+                        <h6 class="card-title">Meest vervuilde locatie</h6>
+                        <p class="card-text text-muted">
+                            @topLocation.LocationName heeft de meeste afvalmeldingen (@topLocation.TotalCount items),
+                            vooral @topWasteType.Key (@topWasteType.Value items).
+                        </p>
+                    </div>
                 </div>
-            </div>
+            }
+
+            @if (trashItems.Any())
+            {
+                var recentItems = trashItems.Where(item => item.Timestamp >= DateTime.Now.AddDays(-7)).Count();
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <span class="badge insight-badge mb-2">Inzicht</span>
+                        <h6 class="card-title">Recente activiteit</h6>
+                        <p class="card-text text-muted">
+                            In de afgelopen week zijn er @recentItems nieuwe afvalitems geregistreerd.
+                        </p>
+                    </div>
+                </div>
+            }
         }
-
-        @if (trashItems.Any())
-        {
-            var recentItems = trashItems.Where(item => item.Timestamp >= DateTime.Now.AddDays(-7)).Count();
-            <div class="card mb-4">
-                <div class="card-body">
-                    <span class="badge insight-badge mb-2">Inzicht</span>
-                    <h6 class="card-title">Recente activiteit</h6>
-                    <p class="card-text text-muted">
-                        In de afgelopen week zijn er @recentItems nieuwe afvalitems geregistreerd.
-                    </p>
-                </div>
-            </div>
-        }
-    }
-</main>
+    </main>
+</AuthGuard>
