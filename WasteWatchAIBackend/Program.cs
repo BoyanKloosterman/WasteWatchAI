@@ -73,7 +73,7 @@ app.MapPost("/account/logout", async (SignInManager<IdentityUser> signInManager)
     return Results.Ok(new { Message = "Successfully logged out" });
 }).RequireAuthorization();
 
-app.MapControllers();
+app.MapControllers().RequireAuthorization();
 
 using (var scope = app.Services.CreateScope())
 {
