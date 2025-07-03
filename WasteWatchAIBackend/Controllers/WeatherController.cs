@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ using WasteWatchAIBackend.Models;
 namespace WasteWatchAIBackend.Controller
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class WeatherController : ControllerBase
     {
@@ -59,33 +61,33 @@ namespace WasteWatchAIBackend.Controller
 
             var weatherList = new List<WeatherData>();
 
-for (int i = 0; i < dates.Count; i++)
-{
-    DateTime timestamp = DateTime.Parse(dates[i].GetString()).ToUniversalTime();
+            for (int i = 0; i < dates.Count; i++)
+            {
+                DateTime timestamp = DateTime.Parse(dates[i].GetString()).ToUniversalTime();
 
-    // Check if values are null
-    var maxTempElem = maxTemps[i];
-    var minTempElem = minTemps[i];
-    if (maxTempElem.ValueKind == JsonValueKind.Null || minTempElem.ValueKind == JsonValueKind.Null)
-        continue; // Or handle as you need (e.g., set a default, skip, or log)
+                // Check if values are null
+                var maxTempElem = maxTemps[i];
+                var minTempElem = minTemps[i];
+                if (maxTempElem.ValueKind == JsonValueKind.Null || minTempElem.ValueKind == JsonValueKind.Null)
+                    continue; // Or handle as you need (e.g., set a default, skip, or log)
 
-    float avgTemp = (maxTempElem.GetSingle() + minTempElem.GetSingle()) / 2;
+                float avgTemp = (maxTempElem.GetSingle() + minTempElem.GetSingle()) / 2;
 
-    bool exists = await _repository.WeatherExistsAsync(timestamp, request.Latitude, request.Longitude);
-    if (exists)
-        continue;
+                bool exists = await _repository.WeatherExistsAsync(timestamp, request.Latitude, request.Longitude);
+                if (exists)
+                    continue;
 
-    var weather = new WeatherData
-    {
-        Timestamp = timestamp,
-        Latitude = request.Latitude,
-        Longitude = request.Longitude,
-        Temperature = avgTemp,
-        WeatherDescription = WeatherCodeToDescription(weatherCodes[i].GetInt32())
-    };
+                var weather = new WeatherData
+                {
+                    Timestamp = timestamp,
+                    Latitude = request.Latitude,
+                    Longitude = request.Longitude,
+                    Temperature = avgTemp,
+                    WeatherDescription = WeatherCodeToDescription(weatherCodes[i].GetInt32())
+                };
 
-    weatherList.Add(weather);
-}
+                weatherList.Add(weather);
+            }
 
 
             foreach (var w in weatherList)

@@ -5,6 +5,7 @@ using WasteWatchAIBackend.Interface;
 using WasteWatchAIBackend.Repository;
 using static Dapper.SqlMapper;
 using Avans.Identity.Dapper;
+using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,11 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddAuthorization();
+builder.Services.AddIdentityApiEndpoints<IdentityUser>().AddDapperStores(options =>
+{
+    options.ConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+});
 
 builder.Services.AddDbContext<WasteWatchDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -34,6 +40,9 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
-app.MapControllers();
+app.MapGroup("/account").MapIdentityApi<IdentityUser>();
+
+
+app.MapControllers().RequireAuthorization();
 
 app.Run();

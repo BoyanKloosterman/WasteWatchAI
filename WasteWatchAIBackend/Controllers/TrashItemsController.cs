@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace WasteWatchAIBackend.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class TrashItemsController : ControllerBase
     {
@@ -30,8 +31,8 @@ namespace WasteWatchAIBackend.Controllers
             var dummyTrashItems = await _context.DummyTrashItems.ToListAsync();
             return Ok(dummyTrashItems);
         }
-        
-                // POST endpoint voor nieuwe TrashItems
+
+        // POST endpoint voor nieuwe TrashItems
         [HttpPost]
         public async Task<ActionResult<TrashItem>> CreateTrashItem(TrashItem trashItem)
         {
