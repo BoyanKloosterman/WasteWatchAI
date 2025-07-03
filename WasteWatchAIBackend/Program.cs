@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using System.Runtime.Intrinsics.X86;
 using WasteWatchAIBackend.Data;
 using WasteWatchAIBackend.Interface;
 using WasteWatchAIBackend.Repository;
+using static Dapper.SqlMapper;
+using Avans.Identity.Dapper;
 
 var builder = WebApplication.CreateBuilder(args);
 

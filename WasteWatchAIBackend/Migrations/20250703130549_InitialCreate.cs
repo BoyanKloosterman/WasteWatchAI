@@ -6,27 +6,24 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace WasteWatchAIBackend.Migrations
 {
     /// <inheritdoc />
-    public partial class initialcreate : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "PredictionResults",
+                name: "DummyTrashItems",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Timestamp = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    LitterType = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Latitude = table.Column<float>(type: "real", nullable: false),
                     Longitude = table.Column<float>(type: "real", nullable: false),
-                    Prediction = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FeatureWeather = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FeatureTemp = table.Column<float>(type: "real", nullable: false),
-                    FeatureLocationType = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    Timestamp = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_PredictionResults", x => x.Id);
+                    table.PrimaryKey("PK_DummyTrashItems", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -65,7 +62,7 @@ namespace WasteWatchAIBackend.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "PredictionResults");
+                name: "DummyTrashItems");
 
             migrationBuilder.DropTable(
                 name: "TrashItems");
