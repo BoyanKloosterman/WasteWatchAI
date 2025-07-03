@@ -27,8 +27,8 @@ async def lifespan(app: FastAPI):
     # Try to initialize models with fallback
     try:
         print("📊 Initializing prediction models...")
-        startup_models_dummy()
-        startup_models()
+        # startup_models_dummy()
+        # startup_models()
         print("✅ Models initialized successfully!")
     except Exception as e:
         print(f"⚠️  Model initialization failed, but server will continue: {e}")
@@ -63,4 +63,4 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
