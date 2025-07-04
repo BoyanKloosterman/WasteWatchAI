@@ -2,6 +2,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using WasteWatchAIFrontend.Models;
 
 namespace WasteWatchAIFrontend.ApiClient
 {
@@ -32,8 +33,8 @@ namespace WasteWatchAIFrontend.ApiClient
 
                 string responseBody = await response.Content.ReadAsStringAsync();
 
-                // Deserialize into Trash object
-                Trash? trash = JsonSerializer.Deserialize<TrashItem>(responseBody, new JsonSerializerOptions
+                // Deserialize into TrashItem object
+                TrashItem? trash = JsonSerializer.Deserialize<TrashItem>(responseBody, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
@@ -44,43 +45,40 @@ namespace WasteWatchAIFrontend.ApiClient
                     return new TrashItem();
                 }
 
-                Console.WriteLine($"ID: {trash.Id}, Name: {trash.CameraId}, Date: {trash.DateCollected}");
+                Console.WriteLine($"ID: {trash.Id}, Type: {trash.LitterType}, Date: {trash.Timestamp}");
                 return trash;
             }
             catch (HttpRequestException e)
             {
                 Console.WriteLine($"Request error: {e.Message}");
-                return new TrashItem() { DagCategorie = e.Message };
+                return new TrashItem();
             }
         }
 
-        public async Task<List<Trash>> GetAllTrash()
+        public async Task<List<TrashItem>> GetAllTrash()
         {
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authorization.Token);
 
             try
             {
-                HttpResponseMessage response = await httpClient.GetAsync(apiBaseUrl + "api/trashitems/dummy");
+                HttpResponseMessage response = await httpClient.GetAsync(apiBaseUrl + "/api/trashitems/dummy");
                 response.EnsureSuccessStatusCode();
 
                 string responseBody = await response.Content.ReadAsStringAsync();
 
-                // Deserialize JSON array into List<Trash>
-                List<Trash> trashList = JsonSerializer.Deserialize<List<Trash>>(responseBody, new JsonSerializerOptions
+                // Deserialize JSON array into List<TrashItem>
+                List<TrashItem> trashList = JsonSerializer.Deserialize<List<TrashItem>>(responseBody, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
-                }) ?? new List<Trash>();
+                }) ?? new List<TrashItem>();
 
                 return trashList;
             }
             catch (HttpRequestException e)
             {
                 Console.WriteLine($"Request error: {e.Message}");
-                return new List<Trash>();
+                return new List<TrashItem>();
             }
         }
-
-
-
     }
 }

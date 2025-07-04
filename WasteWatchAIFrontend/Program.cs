@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using WasteWatchAIFrontend.Components;
+using WasteWatchAIFrontend.Services;
+using WasteWatchAIFrontend.ApiClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +25,10 @@ builder.Services.AddHttpClient("FastAPI", client =>
     client.BaseAddress = new Uri("http://localhost:8000/"); // Replace with your FastAPI base URL
     client.DefaultRequestHeaders.Add("Accept", "application/json");
 });
+
+// Register Authorization and AuthenticationService for DI
+builder.Services.AddScoped<Authorization>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 
 var app = builder.Build();
 

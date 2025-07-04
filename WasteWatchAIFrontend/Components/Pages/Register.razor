@@ -1,6 +1,8 @@
 @page "/register"
 @using WasteWatchAIFrontend.Models
 @using WasteWatchAIFrontend.Services
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
 @inject IAuthenticationService AuthService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
@@ -17,7 +19,7 @@
 
         <EditForm Model="@registerModel" OnValidSubmit="@HandleRegister" FormName="RegisterForm">
             <DataAnnotationsValidator />
-            
+
             @if (!string.IsNullOrEmpty(errorMessage))
             {
                 <div class="alert alert-danger" role="alert">
@@ -43,11 +45,11 @@
             <div class="form-group">
                 <label for="password">Wachtwoord</label>
                 <div class="password-input-container">
-                    <InputText @bind-Value="registerModel.Password" 
-                              type="@(showPassword ? "text" : "password")" 
-                              class="form-control" 
-                              id="password" 
-                              placeholder="Minimaal 6 karakters" />
+                    <InputText @bind-Value="registerModel.Password"
+                               type="@(showPassword ? "text" : "password")"
+                               class="form-control"
+                               id="password"
+                               placeholder="Minimaal 6 karakters" />
                     <button type="button" class="password-toggle" @onclick="TogglePasswordVisibility">
                         <i class="fas @(showPassword ? "fa-eye-slash" : "fa-eye")"></i>
                     </button>
@@ -64,11 +66,11 @@
             <div class="form-group">
                 <label for="confirmPassword">Bevestig wachtwoord</label>
                 <div class="password-input-container">
-                    <InputText @bind-Value="registerModel.ConfirmPassword" 
-                              type="@(showConfirmPassword ? "text" : "password")" 
-                              class="form-control" 
-                              id="confirmPassword" 
-                              placeholder="Herhaal je wachtwoord" />
+                    <InputText @bind-Value="registerModel.ConfirmPassword"
+                               type="@(showConfirmPassword ? "text" : "password")"
+                               class="form-control"
+                               id="confirmPassword"
+                               placeholder="Herhaal je wachtwoord" />
                     <button type="button" class="password-toggle" @onclick="ToggleConfirmPasswordVisibility">
                         <i class="fas @(showConfirmPassword ? "fa-eye-slash" : "fa-eye")"></i>
                     </button>
@@ -121,6 +123,7 @@
             opacity: 0;
             transform: translateY(30px);
         }
+
         to {
             opacity: 1;
             transform: translateY(0);
@@ -132,27 +135,27 @@
         margin-bottom: 30px;
     }
 
-    .register-header h2 {
-        color: #333;
-        margin-bottom: 10px;
-        font-weight: 600;
-    }
+        .register-header h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
 
-    .register-header p {
-        color: #666;
-        margin: 0;
-    }
+        .register-header p {
+            color: #666;
+            margin: 0;
+        }
 
     .form-group {
         margin-bottom: 20px;
     }
 
-    .form-group label {
-        display: block;
-        margin-bottom: 8px;
-        font-weight: 500;
-        color: #333;
-    }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
 
     .form-control {
         width: 100%;
@@ -164,11 +167,11 @@
         box-sizing: border-box;
     }
 
-    .form-control:focus {
-        outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
 
     .password-input-container {
         position: relative;
@@ -187,20 +190,20 @@
         padding: 4px;
     }
 
-    .password-toggle:hover {
-        color: #333;
-    }
+        .password-toggle:hover {
+            color: #333;
+        }
 
     .password-requirements {
         margin-top: 6px;
     }
 
-    .password-requirements small {
-        color: #666;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
+        .password-requirements small {
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
 
     .btn {
         padding: 12px 24px;
@@ -221,16 +224,16 @@
         color: white;
     }
 
-    .btn-primary:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
-    }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
 
-    .btn-primary:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-        transform: none;
-    }
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
 
     .btn-block {
         width: 100%;
@@ -264,10 +267,10 @@
         border-top: 1px solid #e1e5e9;
     }
 
-    .register-footer p {
-        color: #666;
-        margin: 0;
-    }
+        .register-footer p {
+            color: #666;
+            margin: 0;
+        }
 
     .login-link {
         color: #667eea;
@@ -275,9 +278,9 @@
         font-weight: 500;
     }
 
-    .login-link:hover {
-        text-decoration: underline;
-    }
+        .login-link:hover {
+            text-decoration: underline;
+        }
 
     .text-danger {
         color: #dc3545;
@@ -290,8 +293,13 @@
     }
 
     @@keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
     }
 </style>
 
@@ -303,36 +311,36 @@
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
 
-    private async Task HandleRegister()
-    {
-        isLoading = true;
-        errorMessage = string.Empty;
-        successMessage = string.Empty;
+private async Task HandleRegister()
+{
+    isLoading = true;
+    errorMessage = string.Empty;
+    successMessage = string.Empty;
 
-        try
+    try
+    {
+        var result = await AuthService.RegisterAsync(registerModel);
+
+        if (result)
         {
-            var success = await AuthService.RegisterAsync(registerModel);
-            
-            if (success)
-            {
-                successMessage = "Account succesvol aangemaakt! Je kunt nu inloggen.";
-                await Task.Delay(2000);
-                Navigation.NavigateTo("/login");
-            }
-            else
-            {
-                errorMessage = "Er is een fout opgetreden bij het aanmaken van je account. Probeer het opnieuw.";
-            }
+            successMessage = "Account succesvol aangemaakt! Je kunt nu inloggen.";
+            await Task.Delay(2000);
+            Navigation.NavigateTo("/login");
         }
-        catch (Exception)
+        else
         {
-            errorMessage = "Er is een fout opgetreden. Probeer het later opnieuw.";
-        }
-        finally
-        {
-            isLoading = false;
+            errorMessage = "Er is een fout opgetreden bij het aanmaken van je account. Probeer het opnieuw.";
         }
     }
+    catch (Exception ex)
+    {
+        errorMessage = $"Er is een fout opgetreden: {ex.Message}";
+    }
+    finally
+    {
+        isLoading = false;
+    }
+}
 
     private void TogglePasswordVisibility()
     {
