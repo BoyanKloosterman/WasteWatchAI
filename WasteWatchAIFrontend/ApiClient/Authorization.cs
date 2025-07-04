@@ -20,7 +20,7 @@ namespace WasteWatchAIFrontend.ApiClient
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _http.PostAsync("http://localhost:8080/account/login", content);
+            var response = await _http.PostAsync("http://localhost:8080/auth/login", content);
 
             if (response.IsSuccessStatusCode)
             {
@@ -39,7 +39,7 @@ namespace WasteWatchAIFrontend.ApiClient
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _http.PostAsync("http://localhost:8080/account/register", content);
+            var response = await _http.PostAsync("http://localhost:8080/auth/register", content);
 
             if (response.IsSuccessStatusCode)
             {

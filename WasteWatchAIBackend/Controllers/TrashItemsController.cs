@@ -13,7 +13,6 @@ namespace WasteWatchAIBackend.Controllers
     public class TrashItemsController : ControllerBase
     {
         private readonly WasteWatchDbContext _context;
-        private readonly IAuthenticationService _authService;
 
         public TrashItemsController(WasteWatchDbContext context)
         {
@@ -23,7 +22,7 @@ namespace WasteWatchAIBackend.Controllers
         [HttpGet("trash")]
         public async Task<ActionResult<IEnumerable<TrashItem>>> GetTrashItems()
         {
-            var userId = _authService.GetCurrentAuthenticatedUserId();
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized();
@@ -35,7 +34,7 @@ namespace WasteWatchAIBackend.Controllers
         [HttpGet("dummy")]
         public async Task<ActionResult<IEnumerable<DummyTrashItem>>> GetDummyTrashItems()
         {
-            var userId = _authService.GetCurrentAuthenticatedUserId();
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized();
