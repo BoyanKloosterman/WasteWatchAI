@@ -26,6 +26,12 @@ var apiKey = builder.Configuration["ApiKey"];
 
 app.Use(async (context, next) =>
 {
+    if (string.IsNullOrEmpty(apiKey))
+    {
+        context.Response.StatusCode = 500;
+        await context.Response.WriteAsync("API Key is not configured on the server.");
+        return;
+    }
     // Allow Swagger UI and static files without API key
     var path = context.Request.Path.Value;
     if (path.StartsWith("/swagger") || path.StartsWith("/favicon") || path.StartsWith("/_framework"))
@@ -33,7 +39,6 @@ app.Use(async (context, next) =>
         await next();
         return;
     }
-
     if (!context.Request.Headers.TryGetValue(API_KEY_NAME, out var extractedApiKey))
     {
         context.Response.StatusCode = 401;
