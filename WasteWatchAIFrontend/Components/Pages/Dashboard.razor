@@ -386,6 +386,18 @@
         }
     }
 
+    private async Task<HttpClient> GetAuthenticatedClientAsync()
+{
+    var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "token");
+    var tokenType = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "tokenType") ?? "Bearer";
+    var client = HttpClientFactory.CreateClient("WasteWatchAPI");
+    if (!string.IsNullOrEmpty(token))
+    {
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, token);
+    }
+    return client;
+}
+
     private async Task InitializeMap()
     {
         try
@@ -584,19 +596,19 @@
         catch { }
     }
 
-    private async Task LoadDummyTrashData()
+private async Task LoadDummyTrashData()
+{
+    try
     {
-        try
+        var httpClient = await GetAuthenticatedClientAsync();
+        var response = await httpClient.GetAsync("api/trashitems/dummy");
+        if (response.IsSuccessStatusCode)
         {
-            var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
-            var response = await httpClient.GetAsync("api/trashitems/dummy");
-            if (response.IsSuccessStatusCode)
-            {
-                trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
-            }
+            trashItems = await response.Content.ReadFromJsonAsync<List<TrashItem>>() ?? new();
         }
-        catch { }
     }
+    catch { }
+}
 
     private async Task OnFilterChanged()
     {

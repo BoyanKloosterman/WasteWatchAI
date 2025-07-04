@@ -3,23 +3,34 @@ using Microsoft.AspNetCore.Mvc;
 using WasteWatchAIBackend.Models;
 using WasteWatchAIBackend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace WasteWatchAIBackend.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class TrashItemsController : ControllerBase
     {
         private readonly WasteWatchDbContext _context;
+        private readonly IAuthenticationService _authenticationService;
 
-        public TrashItemsController(WasteWatchDbContext context)
+        public TrashItemsController(WasteWatchDbContext context, IAuthenticationService authenticationService)
         {
             _context = context;
+            _authenticationService = authenticationService;
         }
 
-        [HttpGet("trash")]
+          [HttpGet("trash")]
         public async Task<ActionResult<IEnumerable<TrashItem>>> GetTrashItems()
         {
+            // Controleer of de gebruiker geauthenticeerd is via de authentication service
+            var userId = _authenticationService.GetCurrentAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized("User is not authenticated.");
+            }
+            
             var trashItems = await _context.TrashItems.ToListAsync();
             return Ok(trashItems);
         }

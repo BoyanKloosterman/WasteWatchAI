@@ -1,0 +1,73 @@
+@page "/login"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+
+<h3>Login</h3>
+
+<EditForm Model="loginModel" OnValidSubmit="HandleLogin" FormName="LoginForm">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <div>
+        <label>Email:</label>
+        <InputText @bind-Value="loginModel.email" />
+    </div>
+    <div>
+        <label>Password:</label>
+        <InputText @bind-Value="loginModel.password" type="password" />
+    </div>
+    <button type="submit">Login</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="text-danger">@errorMessage</div>
+}
+
+@code {
+    private LoginRequest loginModel = new();
+    private string? errorMessage;
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+        var response = await Http.PostAsJsonAsync("https://localhost:8080/account/login", loginModel);
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+            if (result != null && !string.IsNullOrEmpty(result.accessToken))
+            {
+                await JS.InvokeVoidAsync("localStorage.setItem", "token", result.accessToken);
+                await JS.InvokeVoidAsync("localStorage.setItem", "tokenType", result.tokenType ?? "Bearer");
+                Console.WriteLine(result.tokenType + result.accessToken);
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = "Login response was invalid.";
+            }
+        }
+        else
+        {
+            errorMessage = "Login failed. Please check your credentials.";
+        }
+    }
+
+    public class LoginRequest
+    {
+        public string email { get; set; } = string.Empty;
+        public string password { get; set; } = string.Empty;
+        public string twoFactorCode { get; set; } = string.Empty;
+        public string twoFactorRecoveryCode { get; set; } = string.Empty;
+    }
+    public class LoginResponse
+    {
+        public string tokenType { get; set; } = string.Empty;
+        public string accessToken { get; set; } = string.Empty;
+        public int expiresIn { get; set; }
+        public string refreshToken { get; set; } = string.Empty;
+    }
+    [Inject] IJSRuntime JS { get; set; } = default!;
+}
