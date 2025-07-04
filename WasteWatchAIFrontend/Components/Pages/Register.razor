@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components
 @using Microsoft.JSInterop
+@using WasteWatchAIFrontend.Models
 
 <h3>Register</h3>
 
@@ -32,7 +33,7 @@
 }
 
 @code {
-    private RegisterModel registerModel = new();
+    private RegisterRequest registerModel = new();
     private string? errorMessage;
 
     private async Task HandleRegister()
@@ -49,10 +50,4 @@
         }
     }
 
-    public class RegisterModel
-    {
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-        public string ConfirmPassword { get; set; } = string.Empty;
-    }
 }

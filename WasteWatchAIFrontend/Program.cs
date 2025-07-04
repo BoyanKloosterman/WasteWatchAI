@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using WasteWatchAIFrontend.Components;
+using WasteWatchAIFrontend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +11,7 @@ builder.Services.AddRazorComponents()
 
 // Add HttpClient services
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 var apiKey = builder.Configuration["ApiKey"] ?? "";
 // Configure a named HttpClient with base address
 builder.Services.AddHttpClient("WasteWatchAPI", client =>
