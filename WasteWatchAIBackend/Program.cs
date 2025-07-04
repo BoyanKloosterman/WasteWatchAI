@@ -23,6 +23,9 @@ builder.Services.AddIdentityApiEndpoints<IdentityUser>(options =>
     options.ConnectionString = DefaultConnection;
 });
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IAuthenticationService, AspNetIdentityAuthenticationService>();
+
 builder.Services.AddDbContext<WasteWatchDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IWeatherRepository, WeatherRepository>();

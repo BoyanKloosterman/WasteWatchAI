@@ -3,14 +3,17 @@ using Microsoft.AspNetCore.Mvc;
 using WasteWatchAIBackend.Models;
 using WasteWatchAIBackend.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace WasteWatchAIBackend.Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class TrashItemsController : ControllerBase
     {
         private readonly WasteWatchDbContext _context;
+        private readonly IAuthenticationService _authService;
 
         public TrashItemsController(WasteWatchDbContext context)
         {
@@ -20,6 +23,11 @@ namespace WasteWatchAIBackend.Controllers
         [HttpGet("trash")]
         public async Task<ActionResult<IEnumerable<TrashItem>>> GetTrashItems()
         {
+            var userId = _authService.GetCurrentAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
             var trashItems = await _context.TrashItems.ToListAsync();
             return Ok(trashItems);
         }
@@ -27,11 +35,16 @@ namespace WasteWatchAIBackend.Controllers
         [HttpGet("dummy")]
         public async Task<ActionResult<IEnumerable<DummyTrashItem>>> GetDummyTrashItems()
         {
+            var userId = _authService.GetCurrentAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
             var dummyTrashItems = await _context.DummyTrashItems.ToListAsync();
             return Ok(dummyTrashItems);
         }
-        
-                // POST endpoint voor nieuwe TrashItems
+
+        // POST endpoint voor nieuwe TrashItems
         [HttpPost]
         public async Task<ActionResult<TrashItem>> CreateTrashItem(TrashItem trashItem)
         {
