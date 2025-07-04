@@ -1,9 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using WasteWatchAIBackend.Models;
 
 namespace WasteWatchAIBackend.Data
 {
-    public class WasteWatchDbContext : DbContext
+    public class WasteWatchDbContext : IdentityDbContext<IdentityUser>
     {
         public WasteWatchDbContext(DbContextOptions<WasteWatchDbContext> options)
             : base(options)
@@ -17,6 +19,7 @@ namespace WasteWatchAIBackend.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            base.OnModelCreating(modelBuilder);
 
         }
     }
