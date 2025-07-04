@@ -26,6 +26,14 @@ var apiKey = builder.Configuration["ApiKey"];
 
 app.Use(async (context, next) =>
 {
+    // Allow Swagger UI and static files without API key
+    var path = context.Request.Path.Value;
+    if (path.StartsWith("/swagger") || path.StartsWith("/favicon") || path.StartsWith("/_framework"))
+    {
+        await next();
+        return;
+    }
+
     if (!context.Request.Headers.TryGetValue(API_KEY_NAME, out var extractedApiKey))
     {
         context.Response.StatusCode = 401;
