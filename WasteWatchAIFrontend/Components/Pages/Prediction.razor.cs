@@ -82,7 +82,8 @@ namespace WasteWatchAIFrontend.Components.Pages
 
             try
             {
-                var httpClient = HttpClientFactory.CreateClient("FastAPI");
+                // Gebruik de geauthenticeerde client
+                var httpClient = await GetAuthenticatedClientAsync();
 
                 var payload = new PredictionRequest
                 {
@@ -100,7 +101,6 @@ namespace WasteWatchAIFrontend.Components.Pages
                 {
                     response = await httpClient.PostAsJsonAsync("api/prediction/predict/trash", payload);
                 }
-
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -123,6 +123,7 @@ namespace WasteWatchAIFrontend.Components.Pages
                 StateHasChanged();
             }
         }
+
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {

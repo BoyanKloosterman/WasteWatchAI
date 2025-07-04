@@ -435,17 +435,17 @@
         CalculateWeeklyTypeBenchmark();
     }
 
- private async Task<HttpClient> GetAuthenticatedClientAsync()
-{
-    var token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
-    var tokenType = await JS.InvokeAsync<string>("localStorage.getItem", "tokenType") ?? "Bearer";
-    var client = HttpClientFactory.CreateClient("WasteWatchAPI");
-    if (!string.IsNullOrEmpty(token))
+    private async Task<HttpClient> GetAuthenticatedClientAsync()
     {
-        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, token);
+        var token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
+        var tokenType = await JS.InvokeAsync<string>("localStorage.getItem", "tokenType") ?? "Bearer";
+        var client = HttpClientFactory.CreateClient("WasteWatchAPI");
+        if (!string.IsNullOrEmpty(token))
+        {
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, token);
+        }
+        return client;
     }
-    return client;
-}
 
 
     private async Task RenderActiveChart()
