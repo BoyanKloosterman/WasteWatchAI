@@ -82,6 +82,12 @@ app.UseAuthorization();
 app.MapGroup("/account")
 .MapIdentityApi<IdentityUser>();
 
+app.MapPost("/account/logout", async (SignInManager<IdentityUser> signInManager) =>
+{
+    await signInManager.SignOutAsync();
+    return Results.Ok(new { Message = "Successfully logged out" });
+}).RequireAuthorization();
+
 app.MapControllers()
 .RequireAuthorization();
 

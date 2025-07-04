@@ -10,6 +10,7 @@
 @using System.Globalization;
 
 <PageTitle>Reports</PageTitle>
+<AuthGuard>
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>
@@ -384,6 +385,7 @@
         </div>
     </div>
 </div>
+</AuthGuard>
 @code {
     private List<TrashItem> trashItems = new();
     private Dictionary<int, int> trashPerWeek = new();

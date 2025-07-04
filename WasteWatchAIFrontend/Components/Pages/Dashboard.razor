@@ -8,7 +8,7 @@
 @rendermode InteractiveServer
 
 <PageTitle>Dashboard</PageTitle>
-
+<AuthGuard>
 @if (showAlert)
 {
     <div class="alert alert-danger alert-dismissible fade show position-fixed top-0 end-0 m-3" style="z-index: 1000;" role="alert">
@@ -263,6 +263,7 @@
         </div>
     </div>
 </div>
+</AuthGuard>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
