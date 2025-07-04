@@ -14,7 +14,7 @@ builder.Services.AddHttpClient();
 // Configure a named HttpClient with base address
 builder.Services.AddHttpClient("WasteWatchAPI", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:8080/"); // Replace with your API base URL
+    client.BaseAddress = new Uri("https://localhost:8080/"); // Replace with your API base URL
     client.DefaultRequestHeaders.Add("Accept", "application/json");
 });
 
