@@ -31,10 +31,10 @@ namespace WasteWatchAIFrontend.Models
 
     public class LoginResponse
     {
-        public string AccessToken { get; set; } = string.Empty;
-        public string RefreshToken { get; set; } = string.Empty;
-        public int ExpiresIn { get; set; } // Dit is meestal in seconden vanaf nu
-        public string TokenType { get; set; } = "Bearer";
+        public string tokenType { get; set; } = string.Empty;
+        public string accessToken { get; set; } = string.Empty;
+        public int expiresIn { get; set; }
+        public string refreshToken { get; set; } = string.Empty;
     }
 
     public class UserInfo

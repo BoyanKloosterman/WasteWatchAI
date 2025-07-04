@@ -8,8 +8,6 @@ namespace WasteWatchAIFrontend.Services
     public interface IAuthenticationService
     {
         event Action? AuthenticationStateChanged;
-        Task<bool> LoginAsync(LoginRequest loginRequest);
-        Task<bool> RegisterAsync(RegisterRequest registerRequest);
         Task LogoutAsync();
         Task<bool> IsAuthenticatedAsync();
         Task<UserInfo?> GetUserInfoAsync();
@@ -36,93 +34,6 @@ namespace WasteWatchAIFrontend.Services
             _logger = logger;
         }
 
-        public async Task<bool> LoginAsync(LoginRequest loginRequest)
-        {
-            try
-            {
-                var json = JsonSerializer.Serialize(loginRequest);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await _httpClient.PostAsync("/account/login", content);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-
-                    // Parse JSON response als dynamic object
-                    using (var document = JsonDocument.Parse(responseContent))
-                    {
-                        var root = document.RootElement;
-
-                        // Probeer de access token te verkrijgen
-                        if (root.TryGetProperty("accessToken", out var accessTokenElement) &&
-                            !string.IsNullOrEmpty(accessTokenElement.GetString()))
-                        {
-                            var accessToken = accessTokenElement.GetString()!;
-
-                            // Token opslaan
-                            await _protectedStorage.SetAsync(TOKEN_KEY, accessToken);
-
-                            // User info opslaan
-                            var userInfo = new UserInfo
-                            {
-                                Email = loginRequest.Email,
-                                IsAuthenticated = true
-                            };
-                            await _protectedStorage.SetAsync(USER_INFO_KEY, JsonSerializer.Serialize(userInfo));
-
-                            // Default authorization header instellen
-                            _httpClient.DefaultRequestHeaders.Authorization =
-                                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-
-                            // Notify components that authentication state has changed
-                            AuthenticationStateChanged?.Invoke();
-
-                            return true;
-                        }
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning("Login failed with status: {StatusCode}", response.StatusCode);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during login");
-            }
-
-            return false;
-        }
-
-        public async Task<bool> RegisterAsync(RegisterRequest registerRequest)
-        {
-            try
-            {
-                var json = JsonSerializer.Serialize(registerRequest);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await _httpClient.PostAsync("/account/register", content);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    _logger.LogInformation("User registered successfully");
-                    return true;
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    _logger.LogWarning("Registration failed with status: {StatusCode}, Error: {Error}",
-                        response.StatusCode, errorContent);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during registration");
-            }
-
-            return false;
-        }
 
         public async Task LogoutAsync()
         {
