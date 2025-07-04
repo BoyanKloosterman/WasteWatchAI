@@ -63,6 +63,11 @@ namespace WasteWatchAIBackend.Controllers
         [HttpPost("dummy")]
         public async Task<ActionResult<DummyTrashItem>> CreateDummyTrashItem(DummyTrashItem dummyTrashItem)
         {
+                        var userId = _authenticationService.GetCurrentAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized("User is not authenticated.");
+            }
             try
             {
                 _context.DummyTrashItems.Add(dummyTrashItem);

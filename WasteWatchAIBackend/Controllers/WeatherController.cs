@@ -9,9 +9,11 @@ using Microsoft.EntityFrameworkCore;
 using WasteWatchAIBackend.Data;
 using WasteWatchAIBackend.Interface;
 using WasteWatchAIBackend.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace WasteWatchAIBackend.Controller
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class WeatherController : ControllerBase
