@@ -20,8 +20,8 @@ namespace WasteWatchAIFrontend.Components.Pages
             { "Glass", "Glas" }
         };
 
-        private DateTime ?selectedDate = DateTime.UtcNow.AddDays(1);
-        private DateTime minDate = DateTime.Today.AddDays(1);      
+        private DateTime? selectedDate = DateTime.UtcNow.AddDays(1);
+        private DateTime minDate = DateTime.Today.AddDays(1);
         private DateTime maxDate = DateTime.Today.AddDays(14);
 
         private bool isLoading = false;
@@ -35,7 +35,7 @@ namespace WasteWatchAIFrontend.Components.Pages
             return "bg-danger";
         }
 
-        
+
 
         private async Task ToggleDataMode()
         {
@@ -140,13 +140,25 @@ namespace WasteWatchAIFrontend.Components.Pages
             }
         }
 
+        private async Task<HttpClient> GetAuthenticatedClientAsync()
+        {
+            var token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
+            var tokenType = await JS.InvokeAsync<string>("localStorage.getItem", "tokenType") ?? "Bearer";
+            var client = HttpClientFactory.CreateClient("WasteWatchAPI");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, token);
+            }
+            return client;
+        }
+
         private async Task InitializeCharts()
         {
             // Check if we're showing prediction results or initializing an empty chart
             await InitializePredictionChart();
             await HandlePrediction();
         }
-        
+
         private async Task InitializePredictionChart()
         {
             try

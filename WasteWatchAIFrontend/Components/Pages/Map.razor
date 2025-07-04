@@ -69,18 +69,18 @@
         <div class="col-md-12">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    
+
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h5 class="card-title fw-bold mb-0">Interactieve kaart</h5>
                         <button class="btn btn-outline-primary" @onclick="SwitchMapMode">
                             Toon @(_useHeatMap ? "Markers" : "Heatmap")
                         </button>
                     </div>
-                    
+
                     <div id="wasteMap" style="height: 300px; width: 100%; border-radius: 0.375rem;"></div>
                 </div>
-                
-                
+
+
             </div>
         </div>
     </div>
@@ -208,6 +208,18 @@
             }
             catch { }
         }
+    }
+
+    private async Task<HttpClient> GetAuthenticatedClientAsync()
+    {
+        var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "token");
+        var tokenType = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "tokenType") ?? "Bearer";
+        var client = HttpClientFactory.CreateClient("WasteWatchAPI");
+        if (!string.IsNullOrEmpty(token))
+        {
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, token);
+        }
+        return client;
     }
 
     private async Task InitializeMap()
@@ -370,7 +382,7 @@
     {
         try
         {
-            var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
+            var httpClient = await GetAuthenticatedClientAsync();
             var response = await httpClient.GetAsync("api/trashitems/dummy");
             if (response.IsSuccessStatusCode)
             {

@@ -81,7 +81,7 @@
                                 </button>
                             </li>
                         </ul>
-                            
+
                         <div class="tab-content">
                             <div class="tab-pane fade @(activeTab == "week" ? "show active" : "")" role="tabpanel">
                                 <i class="bi bi-question-circle-fill text-primary"
@@ -105,7 +105,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
 
                     <div class="tab-content">
                         <div class="tab-pane fade @(activeTab == "week" ? "show active" : "")" role="tabpanel">
@@ -435,6 +435,19 @@
         CalculateWeeklyTypeBenchmark();
     }
 
+ private async Task<HttpClient> GetAuthenticatedClientAsync()
+{
+    var token = await JS.InvokeAsync<string>("localStorage.getItem", "token");
+    var tokenType = await JS.InvokeAsync<string>("localStorage.getItem", "tokenType") ?? "Bearer";
+    var client = HttpClientFactory.CreateClient("WasteWatchAPI");
+    if (!string.IsNullOrEmpty(token))
+    {
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(tokenType, token);
+    }
+    return client;
+}
+
+
     private async Task RenderActiveChart()
     {
         if (activeTab == "week")
@@ -568,7 +581,7 @@
     {
         try
         {
-            var httpClient = HttpClientFactory.CreateClient("WasteWatchAPI");
+            var httpClient = await GetAuthenticatedClientAsync();
             var response = await httpClient.GetAsync("api/trashitems/dummy");
             if (response.IsSuccessStatusCode)
             {
@@ -677,7 +690,7 @@
 
                 MonthlyBenchmark = trashTypeCountPerMonth
                     .OrderBy(kvp => kvp.Key)
-                    .TakeLast(6) 
+                    .TakeLast(6)
                     .Select(kvp => new
                     {
                         MonthCode = kvp.Key,
