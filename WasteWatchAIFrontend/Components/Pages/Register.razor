@@ -319,9 +319,9 @@ private async Task HandleRegister()
 
     try
     {
-        var result = await AuthService.RegisterAsync(registerModel);
+        var (success, error) = await AuthService.RegisterAsync(registerModel);
 
-        if (result)
+        if (success)
         {
             successMessage = "Account succesvol aangemaakt! Je kunt nu inloggen.";
             await Task.Delay(2000);
@@ -329,7 +329,7 @@ private async Task HandleRegister()
         }
         else
         {
-            errorMessage = "Er is een fout opgetreden bij het aanmaken van je account. Probeer het opnieuw.";
+            errorMessage = !string.IsNullOrWhiteSpace(error) ? error : "Er is een fout opgetreden bij het aanmaken van je account. Probeer het opnieuw.";
         }
     }
     catch (Exception ex)

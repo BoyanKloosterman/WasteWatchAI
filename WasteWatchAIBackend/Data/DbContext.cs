@@ -20,6 +20,13 @@ namespace WasteWatchAIBackend.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<IdentityUser>().ToTable("AspNetUsers", "auth");
+            modelBuilder.Entity<IdentityRole>().ToTable("AspNetRoles", "auth");
+            modelBuilder.Entity<IdentityUserRole<string>>().ToTable("AspNetUserRoles", "auth");
+            modelBuilder.Entity<IdentityUserClaim<string>>().ToTable("AspNetUserClaims", "auth");
+            modelBuilder.Entity<IdentityRoleClaim<string>>().ToTable("AspNetRoleClaims", "auth");
+            modelBuilder.Entity<IdentityUserLogin<string>>().ToTable("AspNetUserLogins", "auth");
+            modelBuilder.Entity<IdentityUserToken<string>>().ToTable("AspNetUserTokens", "auth");
 
         }
     }

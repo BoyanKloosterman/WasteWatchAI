@@ -33,9 +33,9 @@ namespace WasteWatchAIFrontend.ApiClient
             return false;
         }
 
-        public async Task<bool> RegisterAsync(string email, string username, string password)
+        public async Task<(bool Success, string? ErrorMessage)> RegisterAsync(string email, string password, string confirmPassword)
         {
-            var payload = new { email, username, password };
+            var payload = new { email, password };
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
@@ -43,12 +43,14 @@ namespace WasteWatchAIFrontend.ApiClient
 
             if (response.IsSuccessStatusCode)
             {
-                var body = await response.Content.ReadAsStringAsync();
-                var doc = JsonDocument.Parse(body);
-                return true;
+                // Registration successful
+                return (true, null);
             }
-
-            return false;
+            else
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                return (false, errorBody);
+            }
         }
 
         public void Logout()

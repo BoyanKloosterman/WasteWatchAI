@@ -16,7 +16,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddIdentityApiEndpoints<IdentityUser>(options =>
 {
     options.User.RequireUniqueEmail = true;
-    options.Password.RequiredLength = 50;
+    options.Password.RequiredLength = 9;
 }).AddRoles<IdentityRole>()
 .AddDapperStores(options =>
 {

@@ -18,10 +18,9 @@ namespace WasteWatchAIFrontend.Services
             return await _authorization.LoginAsync(loginModel.Email, loginModel.Password);
         }
 
-        public async Task<bool> RegisterAsync(RegisterRequest registerModel)
+        public async Task<(bool Success, string? ErrorMessage)> RegisterAsync(RegisterRequest registerModel)
         {
-            // Username is not in RegisterRequest, so use Email as username
-            return await _authorization.RegisterAsync(registerModel.Email, registerModel.Email, registerModel.Password);
+            return await _authorization.RegisterAsync(registerModel.Email, registerModel.Password, registerModel.ConfirmPassword);
         }
     }
 }
