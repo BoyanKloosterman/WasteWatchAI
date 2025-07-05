@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using WasteWatchAIFrontend.Components;
 using WasteWatchAIFrontend.Services;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -12,6 +13,7 @@ builder.Services.AddRazorComponents()
 // Add HttpClient services
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<AuthenticationMessageHandler>();
 // var apiKey = builder.Configuration["ApiKey"] ?? "";
 // Configure a named HttpClient with base address
 builder.Services.AddHttpClient("WasteWatchAPI", client =>
@@ -20,12 +22,11 @@ builder.Services.AddHttpClient("WasteWatchAPI", client =>
     client.DefaultRequestHeaders.Add("Accept", "application/json");
     // Add API key header to all requests
     //client.DefaultRequestHeaders.Add("X-API-KEY", apiKey);
-});
+}).AddHttpMessageHandler<AuthenticationMessageHandler>();
 
 builder.Services.AddHttpClient("FastAPI", client =>
 {
     client.BaseAddress = new Uri("http://localhost:8000/"); // Replace with your FastAPI base URL
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
 });
 
 var app = builder.Build();
