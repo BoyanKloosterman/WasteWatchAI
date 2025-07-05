@@ -271,18 +271,9 @@
             var response = await Http.PostAsJsonAsync("https://localhost:8080/account/login", loginModel);
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
-                if (result != null && !string.IsNullOrEmpty(result.accessToken))
-                {
-                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "token", result.accessToken);
-                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "tokenType", result.tokenType ?? "Bearer");
-                    Navigation.NavigateTo("/");
-                    return;
-                }
-                else
-                {
-                    errorMessage = "Login response was invalid.";
-                }
+                var success = await AuthService.LoginAsync(loginModel);
+
+                if (success) Navigation.NavigateTo("/");
             }
             else
             {

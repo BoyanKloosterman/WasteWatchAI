@@ -7,4 +7,8 @@
     <UserSecretsId>3709f827-871a-4ce5-9fe1-31142888bfac</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Folder Include="Services\" />
+  </ItemGroup>
+
 </Project>

@@ -1,4 +1,5 @@
 @using WasteWatchAIFrontend.Services
+@using WasteWatchAIFrontend.Models
 @inject IAuthenticationService AuthService
 @inject NavigationManager Navigation
 @implements IDisposable
@@ -9,8 +10,8 @@
     @if (isAuthenticated)
     {
         <span class="user-info">@userEmail</span>
-        <button class="btn btn-outline-primary btn-sm logout-btn" @onclick="HandleLogout">
-            <i class="fas fa-sign-out-alt"></i> 
+        <button class="btn btn-outline-primary btn-sm logout-btn" @onclick="AuthService.LogoutAsync">
+            <i class="fas fa-sign-out-alt"></i>
             <span class="btn-text">Uitloggen</span>
         </button>
     }
@@ -18,11 +19,11 @@
     {
         <div class="auth-buttons">
             <a href="/login" class="btn btn-outline-primary btn-sm auth-btn">
-                <i class="fas fa-sign-in-alt"></i> 
+                <i class="fas fa-sign-in-alt"></i>
                 <span class="btn-text">Inloggen</span>
             </a>
             <a href="/register" class="btn btn-primary btn-sm auth-btn register-btn">
-                <i class="fas fa-user-plus"></i> 
+                <i class="fas fa-user-plus"></i>
                 <span class="btn-text">Registreren</span>
             </a>
         </div>
@@ -72,13 +73,13 @@
         color: #6c757d;
     }
 
-    .auth-btn:hover {
-        background: #6c757d;
-        border-color: #6c757d !important;
-        color: white;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
+        .auth-btn:hover {
+            background: #6c757d;
+            border-color: #6c757d !important;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
 
     .register-btn {
         background: #0d6efd !important;
@@ -86,13 +87,13 @@
         border: 1px solid #0d6efd !important;
     }
 
-    .register-btn:hover {
-        background: #0b5ed7 !important;
-        border-color: #0a58ca !important;
-        color: white !important;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
+        .register-btn:hover {
+            background: #0b5ed7 !important;
+            border-color: #0a58ca !important;
+            color: white !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
 
     .logout-btn {
         background: transparent;
@@ -100,13 +101,13 @@
         border: 1px solid #dc3545 !important;
     }
 
-    .logout-btn:hover {
-        background: #dc3545;
-        border-color: #dc3545 !important;
-        color: white;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
+        .logout-btn:hover {
+            background: #dc3545;
+            border-color: #dc3545 !important;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
 
     .btn-text {
         display: inline;
@@ -116,18 +117,18 @@
         .auth-section {
             justify-content: center;
         }
-        
+
         .auth-buttons {
             justify-content: center;
             gap: 6px;
         }
-        
+
         .user-info {
             font-size: 12px;
             text-align: center;
             padding: 4px 8px;
         }
-        
+
         .auth-btn, .logout-btn {
             padding: 4px 12px !important;
             font-size: 12px !important;
@@ -138,7 +139,7 @@
         .btn-text {
             display: none;
         }
-        
+
         .auth-btn, .logout-btn {
             padding: 6px 8px !important;
             border-radius: 50% !important;
@@ -156,7 +157,7 @@
     protected override async Task OnInitializedAsync()
     {
         await CheckAuthenticationStatus();
-        
+
         // Subscribe to authentication state changes
         AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
     }
@@ -175,7 +176,7 @@
         try
         {
             isAuthenticated = await AuthService.IsAuthenticatedAsync();
-            
+
             if (isAuthenticated)
             {
                 var userInfo = await AuthService.GetUserInfoAsync();
