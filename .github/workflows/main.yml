@@ -136,7 +136,7 @@ jobs:
       - name: Integration tests
         run: |
           echo "Starting integration tests..."
-            
+        
             # Run integration tests
             echo "Running FastAPI integration tests..."
             cd ../../WasteWatchAIFastApi
