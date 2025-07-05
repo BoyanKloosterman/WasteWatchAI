@@ -136,37 +136,11 @@ jobs:
       - name: Integration tests
         run: |
           echo "Starting integration tests..."
-          
-          # Start mock API for testing if available
-          if [ -f "./WasteWatchAIBackend/mock-api/package.json" ]; then
-            echo "Starting Mock API..."
-            cd ./WasteWatchAIBackend/mock-api
-            npm start &
-            MOCK_PID=$!
-            echo "Mock API started with PID: $MOCK_PID"
-            
-            # Wait for service to start
-            echo "Waiting for Mock API to start..."
-            sleep 15
-            
-            # Test if Mock API is responding
-            if curl -f http://localhost:8080/api/TrashItems/dummy >/dev/null 2>&1; then
-              echo "Mock API is responding"
-            else
-              echo "Mock API not responding, continuing anyway..."
-            fi
             
             # Run integration tests
             echo "Running FastAPI integration tests..."
             cd ../../WasteWatchAIFastApi
             python test_main.py || echo "Integration tests failed, but continuing..."
-            
-            # Cleanup
-            echo "Stopping Mock API..."
-            kill $MOCK_PID 2>/dev/null || true
-          else
-            echo "No Mock API found, skipping integration tests"
-          fi
 
   local-deployment:
     needs: build-and-test
