@@ -1,3 +1,4 @@
+
 name: CI/CD Pipeline
 
 on:
@@ -39,7 +40,6 @@ jobs:
           else
             echo "No test files found. Skipping FastAPI tests."
           fi
-
       # ---- NODE.JS (Mock API) ----
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -54,7 +54,6 @@ jobs:
           else
             echo "No package.json found in mock-api directory"
           fi
-
       # ---- .NET Core API ----
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -83,7 +82,6 @@ jobs:
           else
             echo "No test projects found. Skipping .NET tests."
           fi
-
       # ---- BLAZOR Frontend ----
       - name: Restore Blazor dependencies
         working-directory: ./WasteWatchAIFrontend
@@ -114,7 +112,6 @@ jobs:
             echo "Error: Migration script not generated"
             exit 1
           fi
-
       # ---- DOCKER BUILDS ----
       - name: Build Docker images
         run: |
@@ -131,17 +128,41 @@ jobs:
           else
             echo "No Dockerfile found for Mock API, skipping..."
           fi
-
       # ---- INTEGRATION TESTS ----
       - name: Integration tests
         run: |
           echo "Starting integration tests..."
-        
+          
+          # Start mock API for testing if available
+          if [ -f "./WasteWatchAIBackend/mock-api/package.json" ]; then
+            echo "Starting Mock API..."
+            cd ./WasteWatchAIBackend/mock-api
+            npm start &
+            MOCK_PID=$!
+            echo "Mock API started with PID: $MOCK_PID"
+            
+            # Wait for service to start
+            echo "Waiting for Mock API to start..."
+            sleep 15
+            
+            # Test if Mock API is responding
+            if curl -f http://localhost:8080/api/TrashItems/dummy >/dev/null 2>&1; then
+              echo "Mock API is responding"
+            else
+              echo "Mock API not responding, continuing anyway..."
+            fi
+            
             # Run integration tests
             echo "Running FastAPI integration tests..."
             cd ../../WasteWatchAIFastApi
             python test_main.py || echo "Integration tests failed, but continuing..."
-
+            
+            # Cleanup
+            echo "Stopping Mock API..."
+            kill $MOCK_PID 2>/dev/null || true
+          else
+            echo "No Mock API found, skipping integration tests"
+          fi
   local-deployment:
     needs: build-and-test
     runs-on: ubuntu-latest
@@ -162,7 +183,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install uvicorn
-
       - name: Start FastAPI service
         working-directory: ./WasteWatchAIFastApi
         run: |
@@ -181,7 +201,6 @@ jobs:
           else
             echo "Warning: FastAPI service might not be responding"
           fi
-
       # ---- DEPLOY .NET BACKEND ----
       - name: Setup .NET for deployment
         uses: actions/setup-dotnet@v4
@@ -193,7 +212,6 @@ jobs:
         run: |
           dotnet restore
           dotnet build --configuration Release --no-restore
-
       - name: Start .NET Backend service
         working-directory: ./WasteWatchAIBackend
         run: |
@@ -212,7 +230,6 @@ jobs:
           else
             echo "Warning: .NET Backend service might not be responding"
           fi
-
       # ---- DEPLOYMENT VERIFICATION ----
       - name: Verify deployment
         run: |
@@ -237,7 +254,6 @@ jobs:
           # Show running processes
           echo "Current running processes:"
           ps aux | grep -E "(uvicorn|dotnet)" | grep -v grep || echo "No services found in process list"
-
       # ---- DEPLOYMENT CLEANUP ----
       - name: Cleanup deployment
         if: always()
@@ -261,4 +277,3 @@ jobs:
           pkill -f "dotnet run" 2>/dev/null || true
           
           echo "Deployment cleanup completed"
-
